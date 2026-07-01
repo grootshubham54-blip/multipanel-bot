@@ -28,7 +28,7 @@ from database import (
 )
 
 from payment import save_payment
-from admin_panel import admin_keyboard
+from admin_panel import admin_keyboard, admin_game_selection_keyboard
 
 # Enable logging
 logging.basicConfig(
@@ -76,6 +76,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("👑 Main Menu", reply_markup=get_main_keyboard(user.id))
         return
 
+    if text == "🔙 Back to Admin":
+        context.user_data["adding_key"] = False
+        context.user_data["checking_stock"] = False
+        context.user_data["selected_game"] = None
+        await update.message.reply_text("👑 Admin Control Panel", reply_markup=admin_keyboard())
+        return
+
     if text == "🔙 Back to Games":
         await update.message.reply_text(
             "🎮 Games\n\nSelect Game / Loader:",
@@ -92,30 +99,42 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- ADMIN ROUTES ---
     if user.id == ADMIN_ID:
         if text == "⚙️ Admin Panel":
+            context.user_data.clear()
             await update.message.reply_text("👑 Admin Control Panel", reply_markup=admin_keyboard())
-            await update.message.reply_text(
-                "Admin Quick Navigation Active:",
-                reply_markup=ReplyKeyboardMarkup([
-                    ["🔑 Add Keys", "📦 Stock"],
-                    ["👥 Total Users", "💰 Purchases"],
-                    ["📊 Statistics", "🔙 Back to Main"]
-                ], resize_keyboard=True)
-            )
             return
 
-        if context.user_data.get("adding_key"):
-            save_key(text)
-            context.user_data["adding_key"] = False
-            await update.message.reply_text("✅ Key Added Successfully", reply_markup=get_main_keyboard(user.id))
-            return
-
+        # 1. Choose Game for Adding Key
         if text == "🔑 Add Keys":
             context.user_data["adding_key"] = True
-            await update.message.reply_text("🔑 Send the license key code string directly:", reply_markup=get_back_keyboard())
+            context.user_data["checking_stock"] = False
+            await update.message.reply_text("🎯 Select the game you want to add keys for:", reply_markup=admin_game_selection_keyboard())
             return
 
+        # 2. Choose Game for Checking Stock
         elif text == "📦 Stock":
-            await update.message.reply_text(f"📦 Available Keys: {get_stock()}")
+            context.user_data["checking_stock"] = True
+            context.user_data["adding_key"] = False
+            await update.message.reply_text("🎯 Select the game to check its individual stock:", reply_markup=admin_game_selection_keyboard())
+            return
+
+        # Handle Game Selection for Admin Actions
+        GAMES_LIST = ["👑 KING iOS", "WINIOS", "NEXT IOS", "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫", "𝘿𝙀𝘼𝘿𝙀𝙔𝙀", "DOLPHIN IOS"]
+        if text in GAMES_LIST:
+            if context.user_data.get("adding_key"):
+                context.user_data["selected_game"] = text
+                await update.message.reply_text(f"🔑 typing keys for [{text}].\n\nSend the license key string directly now:", reply_markup=get_back_keyboard("Admin"))
+                return
+            elif context.user_data.get("checking_stock"):
+                stock_count = get_stock(text)
+                await update.message.reply_text(f"📦 Available Keys for *{text}*: `{stock_count}`", parse_mode="Markdown", reply_markup=admin_game_selection_keyboard())
+                return
+
+        # Catch Text Input when adding keys
+        if context.user_data.get("adding_key") and context.user_data.get("selected_game"):
+            game = context.user_data["selected_game"]
+            save_key(game, text)
+            # Stay in key adding state so admin can send multiple keys one by one
+            await update.message.reply_text(f"✅ Key added successfully for [{game}]. Send next key or click Back to Admin.", reply_markup=get_back_keyboard("Admin"))
             return
 
         elif text == "👥 Total Users":
@@ -127,11 +146,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         elif text == "📊 Statistics":
+            total_stock = get_stock() # Total combined stock
             await update.message.reply_text(
-                "📊 System Statistics\n\n"
-                f"👥 Users: {get_total_users()}\n"
-                f"📦 Stock: {get_stock()}\n"
-                f"💰 Purchases: {get_total_purchases()}"
+                "📊 *System Statistics*\n\n"
+                f"👥 *Total Users:* {get_total_users()}\n"
+                f"📦 *Total Combined Stock:* {total_stock}\n"
+                f"💰 *Total Approved Purchases:* {get_total_purchases()}",
+                parse_mode="Markdown"
             )
             return
 
