@@ -44,3 +44,40 @@ def add_user(user_id, username):
 
     conn.commit()
     conn.close()
+
+
+def update_payment_status(payment_id, status):
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE payments
+        SET status = ?
+        WHERE id = ?
+        """,
+        (status, payment_id)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_payment(payment_id):
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT user_id, plan, amount, status
+        FROM payments
+        WHERE id = ?
+        """,
+        (payment_id,)
+    )
+
+    payment = cursor.fetchone()
+
+    conn.close()
+
+    return payment
