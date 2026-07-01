@@ -23,6 +23,7 @@ def create_tables():
     CREATE TABLE IF NOT EXISTS payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
+        plan TEXT,
         amount TEXT,
         status TEXT DEFAULT 'pending'
     )
