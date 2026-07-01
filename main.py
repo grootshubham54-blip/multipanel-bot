@@ -40,7 +40,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", 0)) 
+
+# 🔥 यहाँ आपकी असली टेलीग्राम आईडी को डायरेक्ट लॉक कर दिया गया है
+ADMIN_ID = 7908981593
 
 # गेम के स्पेशल नामों को सुरक्षित शॉर्ट-कोड में बदलने के लिए मैपिंग
 GAME_MAPPING = {
@@ -62,7 +64,7 @@ def get_main_keyboard(user_id: int) -> ReplyKeyboardMarkup:
         ["📞 Support", "👤 Profile"],
         ["💳 Payment"]
     ]
-    if user_id == ADMIN_ID:
+    if int(user_id) == ADMIN_ID:
         keyboard.append(["⚙️ Admin Panel"])
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -114,7 +116,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # --- ADMIN ROUTES ---
-    if user.id == ADMIN_ID:
+    if int(user.id) == ADMIN_ID:
         if text == "⚙️ Admin Panel":
             context.user_data.clear()
             await update.message.reply_text("👑 Admin Control Panel", reply_markup=admin_keyboard())
