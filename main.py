@@ -40,8 +40,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
-
-# Railway पर ADMIN_ID सेट है तो वहां से उठाएगा, बैकअप के लिए 0 रखा है
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0)) 
 
 # गेम के स्पेशल नामों को सुरक्षित शॉर्ट-कोड में बदलने के लिए मैपिंग
@@ -432,7 +430,6 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if ADMIN_ID:
         photo_file_id = update.message.photo[-1].file_id
         
-        # गेम के असली नाम को शॉर्ट-कोड में बदलें (ताकि 64 bytes से छोटा रहे)
         short_game = GAME_MAPPING.get(base_game, "king")
 
         buttons = InlineKeyboardMarkup([
@@ -473,7 +470,6 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "acc":
         short_game = parts[3] if len(parts) > 3 else "king"
-        # शॉर्ट-कोड से वापस डाटाबेस के लिए असली नाम निकालें
         game_name = REVERSE_GAME_MAPPING.get(short_game, "👑 KING iOS")
         
         conn = sqlite3.connect(DB_NAME)
