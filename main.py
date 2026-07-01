@@ -24,6 +24,7 @@ from database import (
 )
 
 from payment import save_payment
+from admin_panel import admin_keyboard
 
 logging.basicConfig(level=logging.INFO)
 
@@ -46,6 +47,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["💳 Payment"]
     ]
 
+    if user.id == ADMIN_ID:
+        keyboard.append(
+            ["⚙️ Admin Panel"]
+        )
+
     await update.message.reply_text(
         "👑 Welcome to KING iOS Bot\n\nSelect an option:",
         reply_markup=ReplyKeyboardMarkup(
@@ -59,6 +65,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
     user = update.effective_user
+
+
+    if text == "⚙️ Admin Panel":
+
+        if user.id == ADMIN_ID:
+
+            await update.message.reply_text(
+                "👑 Admin Panel",
+                reply_markup=admin_keyboard()
+            )
+
+        return
 
 
     if text == "🎮 Games":
@@ -129,7 +147,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if ADMIN_ID:
 
-            admin_keyboard = InlineKeyboardMarkup(
+            admin_keyboard_btn = InlineKeyboardMarkup(
                 [
                     [
                         InlineKeyboardButton(
@@ -155,7 +173,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"💰 Amount: ₹{amount}\n\n"
                     "Status: Pending"
                 ),
-                reply_markup=admin_keyboard
+                reply_markup=admin_keyboard_btn
             )
 
 
@@ -247,10 +265,7 @@ def main():
 
 
     app.add_handler(
-        CommandHandler(
-            "start",
-            start
-        )
+        CommandHandler("start", start)
     )
 
 
@@ -263,9 +278,7 @@ def main():
 
 
     app.add_handler(
-        CallbackQueryHandler(
-            admin_action
-        )
+        CallbackQueryHandler(admin_action)
     )
 
 
