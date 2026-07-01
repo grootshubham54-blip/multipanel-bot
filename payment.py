@@ -20,5 +20,9 @@ def save_payment(user_id, plan, amount):
         )
     )
 
+    payment_id = cursor.lastrowid
+
     conn.commit()
     conn.close()
+
+    return payment_id
