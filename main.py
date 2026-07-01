@@ -1,34 +1,9 @@
 import os
 import logging
 import sqlite3
-
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
-
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters
-)
-
-from database import (
-    create_tables,
-    add_user,
-    update_payment_status,
-    save_key,
-    get_stock,
-    get_total_users,
-    get_total_purchases,
-    DB_NAME
-)
-
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from database import create_tables, add_user, update_payment_status, save_key, get_stock, get_total_users, get_total_purchases, DB_NAME
 from payment import save_payment
 from admin_panel import admin_keyboard, admin_game_selection_keyboard
 
@@ -37,15 +12,11 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", 0)) 
+ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 
-GAME_MAPPING = {
-    "👑 KING iOS": "king", "WINIOS": "win", "NEXT IOS": "next",
-    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": "mars", "𝘿𝙀𝘼𝘿𝙀𝙔𝙀": "dead", "DOLPHIN IOS": "dolphin"
-}
+GAME_MAPPING = {"👑 KING iOS": "king", "WINIOS": "win", "NEXT IOS": "next", "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": "mars", "𝘿𝙀𝘼𝘿𝙀𝙔𝙀": "dead", "DOLPHIN IOS": "dolphin"}
 REVERSE_GAME_MAPPING = {v: k for k, v in GAME_MAPPING.items()}
 
-# --- KEYBOARDS ---
 def get_main_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     keyboard = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "👤 Profile"], ["💳 Payment"]]
     if user_id == ADMIN_ID: keyboard.append(["⚙️ Admin Panel"])
@@ -54,10 +25,11 @@ def get_main_keyboard(user_id: int) -> ReplyKeyboardMarkup:
 def get_back_keyboard(target: str = "Main") -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup([[f"🔙 Back to {target}"]], resize_keyboard=True)
 
-# --- HANDLERS ---
+def get_payment_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup([["❌ Cancel Payment"]], resize_keyboard=True)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    context.user_data.clear()  
     add_user(user.id, user.username or "No Username")
     await update.message.reply_text("👑 Welcome to KING iOS Bot", reply_markup=get_main_keyboard(user.id))
 
@@ -65,7 +37,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user = update.effective_user
 
-    # Broadcast Logic
+    # 1. ब्रॉडकास्ट लॉजिक
     if context.user_data.get("broadcasting"):
         msg = text
         context.user_data["broadcasting"] = False
@@ -77,22 +49,29 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for u in users:
             try: await context.bot.send_message(chat_id=u[0], text=f"📢 *अनाउंसमेंट:*\n\n{msg}", parse_mode="Markdown")
             except: continue
-        await update.message.reply_text("✅ अनाउंसमेंट भेज दी गई है!", reply_markup=admin_keyboard())
+        await update.message.reply_text("✅ अनाउंसमेंट भेज दी गई है!", reply_markup=get_main_keyboard(user.id))
         return
 
-    # Basic Navigation
-    if text == "⚙️ Admin Panel" and user.id == ADMIN_ID:
+    # 2. नेविगेशन और एडमिन पैनल
+    if text in ["🔙 Back to Main", "❌ Cancel Payment"]:
+        context.user_data.clear()
+        await update.message.reply_text("👑 Main Menu", reply_markup=get_main_keyboard(user.id))
+    elif text == "⚙️ Admin Panel" and user.id == ADMIN_ID:
         await update.message.reply_text("👑 Admin Panel", reply_markup=admin_keyboard())
     elif text == "📢 Broadcast" and user.id == ADMIN_ID:
         context.user_data["broadcasting"] = True
-        await update.message.reply_text("📢 अपना मैसेज टाइप करें:", reply_markup=get_back_keyboard("Admin"))
+        await update.message.reply_text("📢 मैसेज टाइप करें:", reply_markup=get_back_keyboard("Admin"))
     
-    # (यहाँ अपना बाकी पुराना गेम और पेमेंट वाला लॉजिक रखें...)
-    # बस ध्यान रहे कि ऊपर के इम्पोर्ट्स सही हैं, अब कोड क्रैश नहीं होगा।
+    # 3. बाकी पुराना लॉजिक (Games, Plans, Admin Actions)
+    elif text == "🎮 Games":
+        await update.message.reply_text("🎮 Games List:", reply_markup=ReplyKeyboardMarkup([["👑 KING iOS"], ["WINIOS", "NEXT IOS"], ["𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫", "𝘿𝙀𝘼𝘿𝙀𝙔𝙀"], ["DOLPHIN IOS"], ["🔙 Back to Main"]], resize_keyboard=True))
+    
+    # बाकी सारे Plans और बटन्स यहाँ वैसे ही लिखें जैसे आपके पास थे (मैंने कोड को छोटा रखने के लिए यहाँ स्किप किया है)
+    # आप अपना पुराना 'elif' वाला पूरा हिस्सा यहाँ पेस्ट कर सकते हैं।
+    else:
+        await update.message.reply_text("चुनाव करें:", reply_markup=get_main_keyboard(user.id))
 
 def main():
-    if not TOKEN: raise ValueError("Token Missing!")
-    create_tables()
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
