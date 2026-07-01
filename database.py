@@ -1,24 +1,30 @@
 import sqlite3
 
-DB_NAME = "bot.db"
-
-
-def connect():
-    return sqlite3.connect(DB_NAME)
-
+DB_NAME = "bot_database.db"
 
 def create_tables():
-    conn = connect()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
+    
+    # Users Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
-        username TEXT,
-        status TEXT DEFAULT 'active'
+        username TEXT
     )
     """)
-
+    
+    # Keys Table (Updated with game_name)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        game_name TEXT,
+        key_code TEXT,
+        is_used INTEGER DEFAULT 0
+    )
+    """)
+    
+    # Payments Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,188 +34,56 @@ def create_tables():
         status TEXT DEFAULT 'pending'
     )
     """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS keys (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE,
-        status TEXT DEFAULT 'available'
-    )
-    """)
-
+    
     conn.commit()
     conn.close()
-
 
 def add_user(user_id, username):
-    conn = connect()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    cursor.execute(
-        "INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)",
-        (user_id, username)
-    )
-
+    cursor.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
     conn.commit()
     conn.close()
 
-
-def save_key(key):
-    conn = connect()
+def save_key(game_name, key_code):
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        INSERT OR IGNORE INTO keys (key)
-        VALUES (?)
-        """,
-        (key,)
-    )
-
+    cursor.execute("INSERT INTO keys (game_name, key_code) VALUES (?, ?)", (game_name, key_code))
     conn.commit()
     conn.close()
 
-
-def get_stock():
-    conn = connect()
+def get_stock(game_name=None):
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT COUNT(*)
-        FROM keys
-        WHERE status='available'
-        """
-    )
-
-    count = cursor.fetchone()[0]
-
+    if game_name:
+        cursor.execute("SELECT COUNT(*) FROM keys WHERE game_name = ? AND is_used = 0", (game_name,))
+        count = cursor.fetchone()[0]
+    else:
+        # Total stock of all games
+        cursor.execute("SELECT COUNT(*) FROM keys WHERE is_used = 0")
+        count = cursor.fetchone()[0]
     conn.close()
-
     return count
-
-
-def delete_key(key):
-    conn = connect()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        DELETE FROM keys
-        WHERE key=?
-        """,
-        (key,)
-    )
-
-    conn.commit()
-    conn.close()
-
-
-def update_payment_status(payment_id, status):
-    conn = connect()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        UPDATE payments
-        SET status=?
-        WHERE id=?
-        """,
-        (status, payment_id)
-    )
-
-    conn.commit()
-    conn.close()
-
 
 def get_total_users():
-    conn = connect()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT COUNT(*) FROM users"
-    )
-
+    cursor.execute("SELECT COUNT(*) FROM users")
     count = cursor.fetchone()[0]
-
     conn.close()
-
     return count
-
 
 def get_total_purchases():
-    conn = connect()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT COUNT(*)
-        FROM payments
-        WHERE status='approved'
-        """
-    )
-
+    cursor.execute("SELECT COUNT(*) FROM payments WHERE status = 'approved'")
     count = cursor.fetchone()[0]
-
     conn.close()
-
     return count
 
-
-# AUTO KEY DELIVERY FUNCTIONS
-
-def get_available_key():
-    conn = connect()
+def update_payment_status(payment_id, status):
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT id, key
-        FROM keys
-        WHERE status='available'
-        LIMIT 1
-        """
-    )
-
-    result = cursor.fetchone()
-
-    conn.close()
-
-    return result
-
-
-def mark_key_used(key_id):
-    conn = connect()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        UPDATE keys
-        SET status='used'
-        WHERE id=?
-        """,
-        (key_id,)
-    )
-
+    cursor.execute("UPDATE payments SET status = ? WHERE id = ?", (status, payment_id))
     conn.commit()
     conn.close()
-
-
-def get_payment_info(payment_id):
-    conn = connect()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT user_id, plan, amount
-        FROM payments
-        WHERE id=?
-        """,
-        (payment_id,)
-    )
-
-    result = cursor.fetchone()
-
-    conn.close()
-
-    return result
