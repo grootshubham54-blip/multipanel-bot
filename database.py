@@ -76,7 +76,8 @@ def get_stock():
 
     cursor.execute(
         """
-        SELECT COUNT(*) FROM keys
+        SELECT COUNT(*)
+        FROM keys
         WHERE status='available'
         """
     )
@@ -142,7 +143,8 @@ def get_total_purchases():
 
     cursor.execute(
         """
-        SELECT COUNT(*) FROM payments
+        SELECT COUNT(*)
+        FROM payments
         WHERE status='approved'
         """
     )
@@ -152,3 +154,62 @@ def get_total_purchases():
     conn.close()
 
     return count
+
+
+# AUTO KEY DELIVERY FUNCTIONS
+
+def get_available_key():
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, key
+        FROM keys
+        WHERE status='available'
+        LIMIT 1
+        """
+    )
+
+    result = cursor.fetchone()
+
+    conn.close()
+
+    return result
+
+
+def mark_key_used(key_id):
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE keys
+        SET status='used'
+        WHERE id=?
+        """,
+        (key_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_payment_info(payment_id):
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT user_id, plan, amount
+        FROM payments
+        WHERE id=?
+        """,
+        (payment_id,)
+    )
+
+    result = cursor.fetchone()
+
+    conn.close()
+
+    return result
