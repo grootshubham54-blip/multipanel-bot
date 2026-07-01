@@ -1,16 +1,18 @@
 from telegram import ReplyKeyboardMarkup
 
-
-def admin_keyboard():
-
+def admin_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
-        ["➕ Add Stock", "🔑 Add Keys"],
-        ["📦 Stock", "🗑 Delete Keys"],
+        ["🔑 Add Keys", "📦 Stock"],
         ["👥 Total Users", "💰 Purchases"],
-        ["📊 Statistics"]
+        ["📊 Statistics", "🔙 Back to Main"]
     ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    return ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True
-    )
+def admin_game_selection_keyboard() -> ReplyKeyboardMarkup:
+    keyboard = [
+        ["👑 KING iOS", "WINIOS"],
+        ["NEXT IOS", "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫"],
+        ["𝘿𝙀𝘼𝘿𝙀𝙔𝙀", "DOLPHIN IOS"],
+        ["🔙 Back to Admin"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
