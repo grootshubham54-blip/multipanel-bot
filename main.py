@@ -1,5 +1,6 @@
 import os
 import logging
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -10,6 +11,7 @@ from telegram.ext import (
 )
 
 from database import create_tables, add_user
+from payment import save_payment
 
 logging.basicConfig(level=logging.INFO)
 
@@ -44,15 +46,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    user = update.effective_user
 
     if text == "📞 Support":
         await update.message.reply_text(
-            "📞 Support\n\nPlease contact admin for help."
+            "📞 Support\n\nContact admin for help."
         )
 
     elif text == "👤 Profile":
-        user = update.effective_user
-
         await update.message.reply_text(
             f"👤 Profile\n\n"
             f"User ID: {user.id}\n"
@@ -70,8 +71,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "💳 Payment":
+        keyboard = [
+            ["✅ I've Paid"]
+        ]
+
+        reply_markup = ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True
+        )
+
         await update.message.reply_text(
-            "💳 Payment section coming soon."
+            "💳 Payment\n\n"
+            "Complete your payment and press the button below.",
+            reply_markup=reply_markup
+        )
+
+    elif text == "✅ I've Paid":
+        save_payment(
+            user.id,
+            "Pending"
+        )
+
+        await update.message.reply_text(
+            "✅ Your payment request has been sent."
         )
 
 
