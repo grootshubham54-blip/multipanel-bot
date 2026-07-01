@@ -27,10 +27,6 @@ from database import (
     get_total_purchases
 )
 
-# Note: Ensure your database module has a function like get_one_key() 
-# or implement a function to fetch and remove/mark a key as used.
-# For now, we will simulate or use a placeholders where needed.
-
 from payment import save_payment
 from admin_panel import admin_keyboard
 
@@ -154,7 +150,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text.startswith("👑 1 DAY"):
         context.user_data["plan"] = "1 DAY"
         context.user_data["amount"] = "200"
-        context.user_data["awaiting_screenshot"] = True  # Set screenshot flow state
+        context.user_data["awaiting_screenshot"] = True
         await payment_info(update, context)
 
     elif text.startswith("👑 1 WEEK"):
@@ -188,7 +184,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def payment_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    qr_image_path = "qr.png" 
+    # Absolute path configured to match the exact filename uploaded on your GitHub
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    qr_image_path = os.path.join(current_dir, "67f1394a-82f8-4d58-b648-6edcb3417c66.jpeg")
+    
     plan = context.user_data.get("plan", "Unknown")
     amount = context.user_data.get("amount", "0")
     
@@ -214,7 +213,7 @@ async def payment_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     except FileNotFoundError:
         await update.message.reply_text(
-            caption_text + "\n\n*(Error: QR Code Image Not Found on Server)*",
+            caption_text + f"\n\n*(Error: QR Code Image Not Found at: {qr_image_path})*",
             parse_mode="Markdown",
             reply_markup=get_back_keyboard("Games")
         )
@@ -224,18 +223,14 @@ async def payment_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    # Check if user is actually in a payment process flow
     if not context.user_data.get("awaiting_screenshot"):
-        await update.message.reply_text("❌ Please select a dynamic game plan first before sending any screenshots.")
+        await update.message.reply_text("❌ Please select a game plan first before sending any screenshots.")
         return
 
     plan = context.user_data.get("plan", "Unknown")
     amount = context.user_data.get("amount", "0")
 
-    # Save payment row status dynamically as pending inside DB
     payment_id = save_payment(user.id, plan, amount)
-
-    # Reset user state cleanly
     context.user_data["awaiting_screenshot"] = False
 
     await update.message.reply_text(
@@ -243,9 +238,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_keyboard(user.id)
     )
 
-    # Route screenshot straight to admin channel for verification
     if ADMIN_ID:
-        # Capture the highest resolution photo sent by user
         photo_file_id = update.message.photo[-1].file_id
 
         buttons = InlineKeyboardMarkup([
@@ -283,15 +276,13 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "accept":
         update_payment_status(payment_id, "approved")
         
-        # TODO: Fetch a real unused license key from your stock database here
-        # Example: generated_key = get_unused_key_from_db()
-        generated_key = "KING-XYZ-MOCK-LICENSE-KEY-12345" # Placeholder
+        # Placeholder key delivery - replace with actual DB retrieval if needed
+        generated_key = "KING-XYZ-MOCK-LICENSE-KEY-12345" 
 
         await query.edit_message_caption(
             caption=f"✅ Payment Approved! Key assigned & dispatched to user ID: {user_id}."
         )
 
-        # Send Key instantly directly to the customer chat
         try:
             await context.bot.send_message(
                 chat_id=user_id,
@@ -310,7 +301,6 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update_payment_status(payment_id, "rejected")
         await query.edit_message_caption(caption="❌ Payment Request Rejected / Denied.")
 
-        # Notify the user instantly about denial status
         try:
             await context.bot.send_message(
                 chat_id=user_id,
@@ -329,10 +319,7 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-    
-    # Handler activated specifically when user uploads photo screenshots
     app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
-    
     app.add_handler(CallbackQueryHandler(admin_action))
 
     print("Bot loop started successfully. Long-polling channels linked.")
