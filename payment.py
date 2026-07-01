@@ -1,7 +1,7 @@
 import sqlite3
 
-DB_NAME = "bot.db"
-
+# इसे 'bot_database.db' करें ताकि यह डेटाबेस वाली फाइल के साथ सिंक रहे
+DB_NAME = "bot_database.db" 
 
 def save_payment(user_id, plan, amount):
     conn = sqlite3.connect(DB_NAME)
