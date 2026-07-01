@@ -29,6 +29,14 @@ def create_tables():
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT UNIQUE,
+        status TEXT DEFAULT 'available'
+    )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -46,6 +54,56 @@ def add_user(user_id, username):
     conn.close()
 
 
+def save_key(key):
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO keys (key)
+        VALUES (?)
+        """,
+        (key,)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_stock():
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT COUNT(*) FROM keys
+        WHERE status='available'
+        """
+    )
+
+    count = cursor.fetchone()[0]
+
+    conn.close()
+
+    return count
+
+
+def delete_key(key):
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        DELETE FROM keys
+        WHERE key=?
+        """,
+        (key,)
+    )
+
+    conn.commit()
+    conn.close()
+
+
 def update_payment_status(payment_id, status):
     conn = connect()
     cursor = conn.cursor()
@@ -53,8 +111,8 @@ def update_payment_status(payment_id, status):
     cursor.execute(
         """
         UPDATE payments
-        SET status = ?
-        WHERE id = ?
+        SET status=?
+        WHERE id=?
         """,
         (status, payment_id)
     )
@@ -63,21 +121,34 @@ def update_payment_status(payment_id, status):
     conn.close()
 
 
-def get_payment(payment_id):
+def get_total_users():
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM users"
+    )
+
+    count = cursor.fetchone()[0]
+
+    conn.close()
+
+    return count
+
+
+def get_total_purchases():
     conn = connect()
     cursor = conn.cursor()
 
     cursor.execute(
         """
-        SELECT user_id, plan, amount, status
-        FROM payments
-        WHERE id = ?
-        """,
-        (payment_id,)
+        SELECT COUNT(*) FROM payments
+        WHERE status='approved'
+        """
     )
 
-    payment = cursor.fetchone()
+    count = cursor.fetchone()[0]
 
     conn.close()
 
-    return payment
+    return count
