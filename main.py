@@ -18,9 +18,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user.username or "No Username"
     )
 
-    await update.message.reply_text(
-        "👑 Welcome to KING iOS Bot\n\n"
-        "Your account has been created."
+    keyboard = [
+    ["🎮 Games", "🔑 My Keys"],
+    ["📞 Support", "👤 Profile"],
+    ["💳 Payment"]
+]
+
+reply_markup = ReplyKeyboardMarkup(
+    keyboard,
+    resize_keyboard=True
+)
+
+await update.message.reply_text(
+    "👑 Welcome to KING iOS Bot\n\n"
+    "Select an option:",
+    reply_markup=reply_markup
+)
     )
 
 
