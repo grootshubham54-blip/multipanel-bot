@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = "7908981593"
 
-# आपकी दी गई नई प्राइसिंग के साथ अपडेटेड कोड:
+# आपकी ओरिजिनल प्राइसिंग लिस्ट
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
     "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
@@ -35,6 +35,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     state = context.user_data.get("state")
 
+    # फोटो हैंडलर
     if update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("u_game", "👑 KING iOS")
         p = context.user_data.get("u_plan", "1 Day")
@@ -44,35 +45,31 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Screenshot received!")
         return
 
-    if user_id == ADMIN_ID and state:
-        if text == "🔙 Back to Admin":
-            context.user_data.clear()
+    # एडमिन लॉजिक
+    if user_id == ADMIN_ID:
+        if text == "🛠 Admin Panel":
             await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
             return
+        if text == "🔑 Add Keys":
+            context.user_data["state"] = "awaiting_game"
+            await update.message.reply_text("Choose game:", reply_markup=admin_game_selection_keyboard())
+            return
         if state == "awaiting_game":
-            if text in GAME_PLANS:
-                context.user_data.update({"add_game": text, "state": "awaiting_plan"})
-                await update.message.reply_text("Now choose the plan:", reply_markup=admin_plan_selection_keyboard())
+            context.user_data.update({"add_game": text, "state": "awaiting_plan"})
+            await update.message.reply_text("Now choose the plan:", reply_markup=admin_plan_selection_keyboard())
             return
-        elif state == "awaiting_plan":
+        if state == "awaiting_plan":
             context.user_data.update({"add_plan": text, "state": "awaiting_keys"})
-            await update.message.reply_text("📝 Enter the Keys:")
+            await update.message.reply_text("📝 Enter the Keys (separate by new line):")
             return
-        elif state == "awaiting_keys":
+        if state == "awaiting_keys":
             keys = [k.strip() for k in text.split("\n") if k.strip()]
             for key in keys: save_key(context.user_data["add_game"], key, context.user_data["add_plan"])
             context.user_data.clear()
-            await update.message.reply_text("✅ Saved!", reply_markup=admin_keyboard())
+            await update.message.reply_text("✅ Keys Saved!", reply_markup=admin_keyboard())
             return
 
-    if user_id == ADMIN_ID:
-        if text in ["🛠 Admin Panel", "🔙 Back to Admin"]:
-            await update.message.reply_text("Admin:", reply_markup=admin_keyboard())
-        elif text == "🔑 Add Keys":
-            context.user_data["state"] = "awaiting_game"
-            await update.message.reply_text("Choose game:", reply_markup=admin_game_selection_keyboard())
-        return
-
+    # यूजर लॉजिक
     if text == "🎮 Games":
         await update.message.reply_text("Select game:", reply_markup=admin_game_selection_keyboard())
     elif text in GAME_PLANS:
@@ -86,6 +83,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    await query.answer()
     data = query.data
     if data.startswith("pay_"):
         _, g, p, pr = data.split("_")
