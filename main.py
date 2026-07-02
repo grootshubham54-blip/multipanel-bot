@@ -1,33 +1,61 @@
 import os
 import logging
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from database import create_tables, get_user_keys
 from admin_panel import admin_keyboard, admin_game_selection_keyboard
 
-# Config
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 
-# ... (GAME_PLANS और बाकी फंक्शन वैसा ही रखें जैसा पहले था)
+# गेम के प्लान
+GAME_PLANS = {
+    "👑 KING iOS": ["1 Day - ₹200", "1 Week - ₹800", "1 Month - ₹2000"],
+    "WINIOS": ["1 Day - ₹199", "1 Week - ₹600", "1 Month - ₹1299"]
+}
 
-async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer() 
+def get_main_keyboard(user_id):
+    keyboard = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "👤 Profile"], ["💳 Payment"]]
+    if user_id == ADMIN_ID:
+        keyboard.append(["⚙️ Admin Panel"])
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    user = update.effective_user
+
+    if text == "🎮 Games":
+        await update.message.reply_text("Select Game:", reply_markup=admin_game_selection_keyboard())
+    elif text in GAME_PLANS:
+        # अब यह 'Reply Keyboard' है, यह कभी 'Loading' नहीं दिखाएगा
+        keyboard = [[KeyboardButton(plan)] for plan in GAME_PLANS[text]]
+        keyboard.append([KeyboardButton("🔙 Back to Main")])
+        await update.message.reply_text(f"🎮 {text} प्लान चुनें:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     
-    if query.data.startswith("buy_"):
-        # यहाँ हम पहले फाइल की जांच करेंगे, फिर भेजेंगे
-        file_path = "new_qr.jpg.JPG"
-        
-        if os.path.exists(file_path):
-            with open(file_path, "rb") as photo:
-                await query.message.reply_photo(photo=photo, caption="✅ यह रहा QR कोड।")
-        else:
-            # अगर फाइल नहीं मिली, तो बोट एरर देने के बजाय सीधे लिंक से भेज देगा
-            await query.message.reply_photo(
-                photo="https://telegra.ph/file/0c32608447814c81a54a0.jpg",
-                caption="✅ सर्वर से QR कोड: पेमेंट करके स्क्रीनशॉट भेजें।"
-            )
+    elif "₹" in text:
+        # QR कोड सीधा भेजा जाएगा
+        await update.message.reply_photo(
+            photo="https://telegra.ph/file/0c32608447814c81a54a0.jpg",
+            caption="✅ यह रहा QR कोड। पेमेंट करके स्क्रीनशॉट भेजें।"
+        )
+    elif text == "🔙 Back to Main":
+        await update.message.reply_text("मेनू:", reply_markup=get_main_keyboard(user.id))
+    else:
+        await update.message.reply_text("मेनू:", reply_markup=get_main_keyboard(user.id))
 
-# ... (बाकी का पूरा कोड वैसे ही रहने दें)
+async def handle_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.photo:
+        await context.bot.send_photo(ADMIN_ID, photo=update.message.photo[-1].file_id, caption=f"👤 User: {update.effective_user.username}\nपेमेंट आई है:")
+        await update.message.reply_text("✅ स्क्रीनशॉट एडमिन को भेज दिया गया है।")
+
+def main():
+    create_tables()
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text("Welcome!", reply_markup=get_main_keyboard(u.effective_user.id))))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_payment))
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
