@@ -1,93 +1,74 @@
-import os
-import logging
-import sqlite3
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import (create_tables, add_user, update_payment_status, save_key, 
-                      get_stock, get_total_users, get_total_purchases, DB_NAME)
-from payment import save_payment
-from admin_panel import admin_keyboard, admin_game_selection_keyboard
-
-# Enable logging
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", 0)) 
-
-GAME_MAPPING = {"👑 KING iOS": "king", "WINIOS": "win", "NEXT IOS": "next", "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": "mars", "𝘿𝙀𝘼𝘿𝙀𝙔𝙀": "dead", "DOLPHIN IOS": "dolphin"}
-REVERSE_GAME_MAPPING = {v: k for k, v in GAME_MAPPING.items()}
-
-def get_main_keyboard(user_id: int) -> ReplyKeyboardMarkup:
-    keyboard = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "👤 Profile"], ["💳 Payment"]]
-    if user_id == ADMIN_ID: keyboard.append(["⚙️ Admin Panel"])
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-def get_back_keyboard(target: str = "Main") -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup([[f"🔙 Back to {target}"]], resize_keyboard=True)
-
-def get_payment_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup([["❌ Cancel Payment"]], resize_keyboard=True)
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    context.user_data.clear()  
-    add_user(user.id, user.username or "No Username")
-    await update.message.reply_text("👑 Welcome to KING iOS Bot\n\nSelect an option:", reply_markup=get_main_keyboard(user.id))
-
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user = update.effective_user
 
-    # Admin Logic with Plan Selection
+    # 1. BROADCAST LOGIC (ब्रॉडकास्ट का फिक्स)
+    if context.user_data.get("broadcasting"):
+        msg_to_send = text
+        context.user_data["broadcasting"] = False
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM users")
+        users = cursor.fetchall()
+        conn.close()
+        count = 0
+        for u in users:
+            try: await context.bot.send_message(chat_id=u[0], text=f"📢 *Announcement:*\n\n{msg_to_send}", parse_mode="Markdown")
+            except: continue
+        await update.message.reply_text(f"✅ Announcement sent to {count} users!", reply_markup=admin_keyboard())
+        return
+
+    # 2. NAVIGATION AND BACK BUTTONS
+    if text == "🔙 Back to Main" or text == "❌ Cancel Payment":
+        context.user_data.clear()  
+        await update.message.reply_text("👑 Main Menu", reply_markup=get_main_keyboard(user.id))
+        return
+
+    if text == "🔙 Back to Admin":
+        context.user_data["adding_key"] = False
+        context.user_data["checking_stock"] = False
+        context.user_data["selected_game"] = None
+        await update.message.reply_text("👑 Admin Control Panel", reply_markup=admin_keyboard())
+        return
+
+    if text == "🔙 Back to Games":
+        await update.message.reply_text(
+            "🎮 Games\n\nSelect Game / Loader:",
+            reply_markup=ReplyKeyboardMarkup([
+                ["👑 KING iOS"], ["WINIOS", "NEXT IOS"],
+                ["𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫", "𝘿𝙀𝘼𝘿𝙀𝙔𝙀"], ["DOLPHIN IOS"],
+                ["🔙 Back to Main"]
+            ], resize_keyboard=True)
+        )
+        return
+
+    # 3. ADMIN ROUTES
     if user.id == ADMIN_ID:
-        # --- ADD KEYS FLOW START ---
-        if text == "🔑 Add Keys":
-            context.user_data["adding_key"] = True
-            await update.message.reply_text("🎯 Select the game:", reply_markup=admin_game_selection_keyboard())
-            return
-
-        # Game Selection Logic
-        GAMES_LIST = ["👑 KING iOS", "WINIOS", "NEXT IOS", "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫", "𝘿𝙀𝘼𝘿𝙀𝙔𝙀", "DOLPHIN IOS"]
-        if text in GAMES_LIST and context.user_data.get("adding_key"):
-            context.user_data["selected_game"] = text
-            plan_kb = ReplyKeyboardMarkup([["1 DAY", "1 WEEK", "1 MONTH"], ["🔙 Back to Admin"]], resize_keyboard=True)
-            await update.message.reply_text(f"Selected: {text}\nअब प्लान चुनें:", reply_markup=plan_kb)
-            context.user_data["selecting_plan"] = True
-            return
-
-        # Plan Selection Logic
-        if context.user_data.get("selecting_plan") and text in ["1 DAY", "1 WEEK", "1 MONTH"]:
-            context.user_data["selected_plan"] = text
-            context.user_data["selecting_plan"] = False
-            context.user_data["awaiting_key"] = True
-            await update.message.reply_text(f"✅ Plan: {text}\n\nअब लाइसेंस की (Key) भेजें:", reply_markup=get_back_keyboard("Admin"))
-            return
-
-        # Key Saving Logic
-        if context.user_data.get("awaiting_key"):
-            save_key(context.user_data["selected_game"], text, context.user_data["selected_plan"])
-            await update.message.reply_text(f"✅ Key added for {context.user_data['selected_game']} ({context.user_data['selected_plan']}). Send another:", reply_markup=get_back_keyboard("Admin"))
-            return
-        
-        # --- OTHER ADMIN COMMANDS (Broadcast, Stock, etc.) ---
-        # ... (आपका बाकी पुराना एडमिन लॉजिक यहाँ रहने दें)
         if text == "⚙️ Admin Panel":
             context.user_data.clear()
             await update.message.reply_text("👑 Admin Control Panel", reply_markup=admin_keyboard())
             return
+        elif text == "📢 Broadcast":
+            context.user_data["broadcasting"] = True
+            await update.message.reply_text("📢 Send your announcement message now:", reply_markup=get_back_keyboard("Admin"))
+            return
+        elif text == "🔑 Add Keys":
+            context.user_data["adding_key"] = True
+            context.user_data["checking_stock"] = False
+            await update.message.reply_text("🎯 Select the game you want to add keys for:", reply_markup=admin_game_selection_keyboard())
+            return
+        elif text == "📦 Stock":
+            context.user_data["checking_stock"] = True
+            context.user_data["adding_key"] = False
+            await update.message.reply_text("🎯 Select the game to check its individual stock:", reply_markup=admin_game_selection_keyboard())
+            return
+        # --- बाक़ी एडमिन लॉजिक (Add Keys, Stats, Users) यहाँ जैसा था वैसा ही रहने दें ---
+        # (ध्यान दें: आपके पास जो पुराने elif/if थे, उन्हें यहाँ पेस्ट रहने दें)
 
-    # User Logic remains same...
-    # (यहाँ आपका पुराना 'CORE USER MENUS' वाला कोड पेस्ट कर दें)
-    # ...
-
-def main():
-    create_tables()
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-    # ... (बाकी हैंडलर्स)
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+    # 4. CORE USER MENUS (Games, Plans, Support, Profile, Payment)
+    # --- आपका पूरा पुराना Games और Plans का कोड यहाँ नीचे बिल्कुल ऐसे ही लगा दें ---
+    # उदाहरण:
+    if text == "🎮 Games":
+        # ... बाकी आपका ओरिजिनल कोड ...
+    
+    # [यहाँ अपना बाकी सारा पुराना कोड पेस्ट करें जो गेम्स और पेमेंट के लिए था]
