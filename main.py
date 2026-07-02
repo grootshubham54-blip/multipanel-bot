@@ -27,6 +27,7 @@ def get_main_keyboard(user_id):
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user = update.effective_user
+    
     if text == "⚙️ Admin Panel" and user.id == ADMIN_ID:
         await update.message.reply_text("👑 Admin Control:", reply_markup=admin_keyboard())
     elif text == "🎮 Games":
@@ -47,10 +48,12 @@ async def handle_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer() 
+    
     if query.data.startswith("buy_"):
-        # QR कोड की पक्की ID, यह कभी फेल नहीं होगी
+        # यहाँ File ID का इस्तेमाल किया गया है ताकि फोटो कभी गायब न हो
         qr_file_id = "AgACAgQAAxkBAAIfC2Z4l6y84r8n7G6q5Vp0R3e1_1tAAAL3zDEbF-6pUfFwBwAB90g-DwEAAwIAA3MAAyQE"
         await query.message.reply_photo(photo=qr_file_id, caption="✅ यह रहा QR कोड। पेमेंट करके स्क्रीनशॉट भेजें।")
+    
     elif query.data.startswith("accept_") or query.data.startswith("reject_"):
         user_id = query.data.split("_")[1]
         action = "एक्सेप्ट" if "accept" in query.data else "रिजेक्ट"
