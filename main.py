@@ -3,11 +3,11 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-# इम्पोर्ट्स - ध्यान दें: admin_panel.py में पहली लाइन 'from' (छोटे f) से शुरू होनी चाहिए
+# इम्पोर्ट्स
 from database import create_tables, get_user_keys
 from admin_panel import admin_keyboard, admin_game_selection_keyboard
 
-# Logging
+# Config
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
@@ -44,12 +44,14 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text in GAME_PLANS:
         keyboard = [[InlineKeyboardButton(f"{plan} - ₹{price}", callback_data=f"buy_{text}_{plan}")] for plan, price in GAME_PLANS[text].items()]
         await update.message.reply_text(f"🎮 {text} प्लान चुनें:", reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await update.message.reply_text("मेनू:", reply_markup=get_main_keyboard(user.id))
 
 async def handle_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo:
         user = update.effective_user
         keyboard = [[InlineKeyboardButton("✅ Accept", callback_data=f"accept_{user.id}"), InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}")]]
-        await context.bot.send_photo(ADMIN_ID, photo=update.message.photo[-1].file_id, caption=f"👤 User: {user.username}\nपेमेंट कन्फर्म करें:", reply_markup=InlineKeyboardMarkup(keyboard))
+        await context.bot.send_photo(ADMIN_ID, photo=update.message.photo[-1].file_id, caption=f"👤 User: {user.username}\nपेमेंट चेक करें:", reply_markup=InlineKeyboardMarkup(keyboard))
         await update.message.reply_text("✅ स्क्रीनशॉट एडमिन को भेज दिया गया है।")
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,8 +59,9 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer() 
     
     if query.data.startswith("buy_"):
-        # यहाँ आपका नया QR नाम जो GitHub पर है
-        await query.message.reply_photo(photo=open("new_qr.jpg.JPG", "rb"), caption="✅ पेमेंट करके स्क्रीनशॉट भेजें।")
+        # QR Code की पक्की ID
+        qr_file_id = "AgACAgQAAxkBAAIfC2Z4l6y84r8n7G6q5Vp0R3e1_1tAAAL3zDEbF-6pUfFwBwAB90g-DwEAAwIAA3MAAyQE"
+        await query.message.reply_photo(photo=qr_file_id, caption="✅ यह रहा QR कोड। पेमेंट करके स्क्रीनशॉट भेजें।")
     elif query.data.startswith("accept_") or query.data.startswith("reject_"):
         user_id = query.data.split("_")[1]
         action = "एक्सेप्ट" if "accept" in query.data else "रिजेक्ट"
