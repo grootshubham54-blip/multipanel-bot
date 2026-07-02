@@ -10,7 +10,6 @@ def create_tables():
     cur = conn.cursor()
     cur.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, username TEXT)")
     cur.execute("CREATE TABLE IF NOT EXISTS keys (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT, plan TEXT, key TEXT, used INTEGER DEFAULT 0, user_id INTEGER)")
-    # पेंडिंग पेमेंट्स के लिए नया टेबल
     cur.execute("""CREATE TABLE IF NOT EXISTS pending_payments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER, 
@@ -36,7 +35,6 @@ def approve_and_assign_key(pending_id):
     cur = conn.cursor()
     cur.execute("SELECT user_id, game, plan FROM pending_payments WHERE id=?", (pending_id,))
     payment = cur.fetchone()
-    
     if payment:
         uid, game, plan = payment
         cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game, plan))
@@ -64,3 +62,12 @@ def save_key(game, key, plan):
     cur.execute("INSERT INTO keys (game, plan, key) VALUES (?, ?, ?)", (game, plan, key))
     conn.commit()
     conn.close()
+
+# यह फंक्शन आपका मिसिंग था:
+def get_user_keys(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=? AND used=1", (user_id,))
+    keys = cur.fetchall()
+    conn.close()
+    return keys
