@@ -50,10 +50,18 @@ def get_total_users():
     conn.close()
     return count
 
+# यह नया फंक्शन जोड़ेगा
+def get_all_keys_report():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT game, plan, key, used, user_id FROM keys")
+    keys = cur.fetchall()
+    conn.close()
+    return keys
+
 def approve_and_assign_key(user_id, game, plan):
     conn = get_conn()
     cur = conn.cursor()
-    # उपलब्ध की (key) खोजें
     cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game, plan))
     row = cur.fetchone()
     if row:
