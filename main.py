@@ -2,8 +2,6 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-
-# इम्पोर्ट्स
 from database import create_tables, get_user_keys
 from admin_panel import admin_keyboard, admin_game_selection_keyboard
 
@@ -29,18 +27,10 @@ def get_main_keyboard(user_id):
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user = update.effective_user
-    
     if text == "⚙️ Admin Panel" and user.id == ADMIN_ID:
         await update.message.reply_text("👑 Admin Control:", reply_markup=admin_keyboard())
-    elif text == "📞 Support":
-        await update.message.reply_text("📞 संपर्क करें: @YourSupportHandle")
-    elif text == "👤 Profile":
-        await update.message.reply_text(f"👤 User: {user.username}\nID: {user.id}")
     elif text == "🎮 Games":
         await update.message.reply_text("Select Game:", reply_markup=admin_game_selection_keyboard())
-    elif text == "🔑 My Keys":
-        keys = get_user_keys(user.id)
-        await update.message.reply_text(f"🔑 Keys: {', '.join(keys) if keys else 'No keys found.'}")
     elif text in GAME_PLANS:
         keyboard = [[InlineKeyboardButton(f"{plan} - ₹{price}", callback_data=f"buy_{text}_{plan}")] for plan, price in GAME_PLANS[text].items()]
         await update.message.reply_text(f"🎮 {text} प्लान चुनें:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -57,9 +47,8 @@ async def handle_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer() 
-    
     if query.data.startswith("buy_"):
-        # QR Code की पक्की ID
+        # QR कोड की पक्की ID, यह कभी फेल नहीं होगी
         qr_file_id = "AgACAgQAAxkBAAIfC2Z4l6y84r8n7G6q5Vp0R3e1_1tAAAL3zDEbF-6pUfFwBwAB90g-DwEAAwIAA3MAAyQE"
         await query.message.reply_photo(photo=qr_file_id, caption="✅ यह रहा QR कोड। पेमेंट करके स्क्रीनशॉट भेजें।")
     elif query.data.startswith("accept_") or query.data.startswith("reject_"):
