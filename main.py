@@ -5,16 +5,17 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler, 
     ContextTypes, filters
 )
+# अपनी database.py और admin_panel.py को उसी फोल्डर में रखें
 from database import (
     create_tables, add_user, save_pending_payment, 
     approve_and_assign_key, get_user_keys
 )
 from admin_panel import admin_keyboard, admin_game_selection_keyboard
 
-# सेटअप
+# Logging सेटअप
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 7908981593  # Integer में रखें (बिना quotes के)
+ADMIN_ID = 7908981593 # Integer में ही रखें
 
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "199", "1 Week": "800", "1 Month": "2000"},
@@ -51,7 +52,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Payment sent for approval!")
         return
 
-    # 2. बटन्स लॉजिक
+    # 2. बटन्स लॉजिक (बटन गायब न हों इसके लिए यह स्ट्रक्चर सुरक्षित है)
     if text == "🛠 Admin Panel" and user_id == ADMIN_ID:
         await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
     elif text == "🎮 Games":
