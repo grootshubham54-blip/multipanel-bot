@@ -125,8 +125,7 @@ async def message_handler(update, context):
                 ],
                 resize_keyboard=True
             )
-        )
-    elif text == "👑 KING iOS":
+elif text == "👑 KING iOS":
     stock = get_stock("👑 KING iOS")
     await update.message.reply_text(
         f"👑 KING iOS\n\n"
