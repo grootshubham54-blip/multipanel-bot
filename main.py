@@ -37,24 +37,206 @@ async def message_handler(update, context):
     text = update.message.text
     user = update.effective_user
 
-    # 1. ADMIN ADD KEY LOGIC
+    # Broadcast Mode
+    if user.id == ADMIN_ID and context.user_data.get("broadcasting"):
+        msg = text
+        context.user_data.pop("broadcasting", None)
+
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM users")
+
+        for row in cursor.fetchall():
+            try:
+                await context.bot.send_message(
+                    chat_id=row[0],
+                    text=f"📢 Announcement\n\n{msg}"
+                )
+            except:
+                pass
+
+        conn.close()
+
+        await update.message.reply_text(
+            "✅ Broadcast Sent!",
+            reply_markup=admin_keyboard()
+        )
+        return
+
+    # Add Key Mode
     if user.id == ADMIN_ID and context.user_data.get("adding_key"):
         if text == "🔙 Back to Admin":
             context.user_data.clear()
-            await update.message.reply_text("👑 Admin Panel", reply_markup=admin_keyboard())
+            await update.message.reply_text(
+                "👑 Admin Panel",
+                reply_markup=admin_keyboard()
+            )
             return
+
         if not context.user_data.get("selected_game"):
             context.user_data["selected_game"] = text
-            await update.message.reply_text("🎯 Select Plan:", reply_markup=ReplyKeyboardMarkup([["1 DAY", "1 WEEK", "1 MONTH"], ["🔙 Back to Admin"]], resize_keyboard=True))
+
+            await update.message.reply_text(
+                "🎯 Select Plan:",
+                reply_markup=ReplyKeyboardMarkup(
+                    [["1 DAY", "1 WEEK", "1 MONTH"],
+                     ["🔙 Back to Admin"]],
+                    resize_keyboard=True
+                )
+            )
             return
+
         elif not context.user_data.get("selected_plan"):
             context.user_data["selected_plan"] = text
-            await update.message.reply_text(f"🔑 Game: {context.user_data['selected_game']} | Plan: {text}\nNow send the KEY:", reply_markup=get_back_keyboard("Admin"))
+
+            await update.message.reply_text(
+                "🔑 Send Key:",
+                reply_markup=get_back_keyboard("Admin")
+            )
             return
+
         else:
-            save_key(context.user_data["selected_game"], text, context.user_data["selected_plan"])
-            await update.message.reply_text(f"✅ Key Added!\nSend next key or Back to Admin.", reply_markup=get_back_keyboard("Admin"))
+            save_key(
+                context.user_data["selected_game"],
+                text,
+                context.user_data["selected_plan"]
+            )
+
+            context.user_data.pop("selected_game", None)
+            context.user_data.pop("selected_plan", None)
+
+            await update.message.reply_text(
+                "✅ Key Added Successfully!",
+                reply_markup=get_back_keyboard("Admin")
+            )
             return
+
+    # User Navigation
+    if text == "🎮 Games":
+        await update.message.reply_text(
+            "Select Game:",
+            reply_markup=ReplyKeyboardMarkup(
+                [
+                    ["👑 KING iOS"],
+                    ["WINIOS", "NEXT IOS"],
+                    ["𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫", "𝘿𝙀𝘼𝘿𝙀𝙔𝙀"],
+                    ["DOLPHIN IOS"],
+                    ["🔙 Back to Main"]
+                ],
+                resize_keyboard=True
+            )
+        )
+
+    elif text == "👑 KING iOS":
+        await update.message.reply_text(
+            f"👑 KING iOS\nAvailable Keys: {get_stock('👑 KING iOS')}"
+        )
+
+    elif text == "WINIOS":
+        await update.message.reply_text(
+            f"WINIOS\nAvailable Keys: {get_stock('WINIOS')}"
+        )
+
+    elif text == "NEXT IOS":
+        await update.message.reply_text(
+            f"NEXT IOS\nAvailable Keys: {get_stock('NEXT IOS')}"
+        )
+
+    elif text == "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫":
+        await update.message.reply_text(
+            f"𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫\nAvailable Keys: {get_stock('𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫')}"
+        )
+
+    elif text == "𝘿𝙀𝘼𝘿𝙀𝙔𝙀":
+        await update.message.reply_text(
+            f"𝘿𝙀𝘼𝘿𝙀𝙔𝙀\nAvailable Keys: {get_stock('𝘿𝙀𝘼𝘿𝙀𝙔𝙀')}"
+        )
+
+    elif text == "DOLPHIN IOS":
+        await update.message.reply_text(
+            f"DOLPHIN IOS\nAvailable Keys: {get_stock('DOLPHIN IOS')}"
+        )
+
+    elif text == "🔑 My Keys":
+        await update.message.reply_text("🔑 My Keys")
+
+    elif text == "📞 Support":
+        await update.message.reply_text(
+            "📞 Support: @IOS_HACK_S"
+        )
+
+    elif text == "👤 Profile":
+        await update.message.reply_text(
+            f"👤 Profile\n\n"
+            f"ID: {user.id}\n"
+            f"Username: @{user.username or 'None'}"
+        )
+
+    elif text == "💳 Payment":
+        await update.message.reply_text(
+            "💳 Payment Section",
+            reply_markup=get_payment_keyboard()
+        )
+
+    elif text == "🔙 Back to Main" or text == "❌ Cancel Payment":
+        context.user_data.clear()
+
+        await update.message.reply_text(
+            "👑 Main Menu",
+            reply_markup=get_main_keyboard(user.id)
+        )
+
+    # Admin Panel
+    elif user.id == ADMIN_ID:
+
+        if text == "⚙️ Admin Panel":
+            await update.message.reply_text(
+                "👑 Admin Panel",
+                reply_markup=admin_keyboard()
+            )
+
+        elif text == "🔑 Add Keys":
+            context.user_data["adding_key"] = True
+
+            await update.message.reply_text(
+                "Select Game:",
+                reply_markup=admin_game_selection_keyboard()
+            )
+
+        elif text == "👥 Total Users":
+            await update.message.reply_text(
+                f"👥 Users: {get_total_users()}"
+            )
+
+        elif text == "📦 Stock":
+            await update.message.reply_text(
+                f"📦 Stock: {get_stock()}"
+            )
+
+        elif text == "💰 Purchases":
+            await update.message.reply_text(
+                f"💰 Purchases: {get_total_purchases()}"
+            )
+
+        elif text == "📊 Statistics":
+            await update.message.reply_text(
+                f"📊 Statistics\n\n"
+                f"👥 Users: {get_total_users()}\n"
+                f"📦 Stock: {get_stock()}\n"
+                f"💰 Purchases: {get_total_purchases()}"
+            )
+
+        elif text == "📢 Broadcast":
+            context.user_data["broadcasting"] = True
+
+            await update.message.reply_text(
+                "📢 Send Broadcast Message"
+            )
+
+    else:
+        await update.message.reply_text(
+            "Please use the menu buttons."
+        )
 
     # 2. USER & ADMIN NAVIGATION
     if text == "🎮 Games":
