@@ -90,28 +90,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user = update.effective_user
 
-    # --- BROADCAST FEATURE ---
-    if context.user_data.get("broadcasting"):
-        msg_to_send = text
-        context.user_data["broadcasting"] = False
-        
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("SELECT user_id FROM users")
-        users = cursor.fetchall()
-        conn.close()
-
-        count = 0
-        for u in users:
-            try:
-                await context.bot.send_message(chat_id=u[0], text=f"📢 *Announcement:*\n\n{msg_to_send}", parse_mode="Markdown")
-                count += 1
-            except:
-                continue
-        
-        await update.message.reply_text(f"✅ Announcement sent to {count} users!", reply_markup=admin_keyboard())
-        return
-
     if text == "🔙 Back to Main" or text == "❌ Cancel Payment":
         context.user_data.clear()  
         await update.message.reply_text("👑 Main Menu", reply_markup=get_main_keyboard(user.id))
@@ -142,11 +120,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text == "⚙️ Admin Panel":
             context.user_data.clear()
             await update.message.reply_text("👑 Admin Control Panel", reply_markup=admin_keyboard())
-            return
-
-        elif text == "📢 Broadcast":
-            context.user_data["broadcasting"] = True
-            await update.message.reply_text("📢 Send your announcement message now:", reply_markup=get_back_keyboard("Admin"))
             return
 
         if text == "🔑 Add Keys":
@@ -571,3 +544,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+ यह जो कोर्ट है, इस पर पूरा बॉट वर्क कर रहा है, कठिन काम कर रहा है, पर पेमेंट है तो एक्सेप्ट करना है।
