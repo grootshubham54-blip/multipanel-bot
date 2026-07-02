@@ -2,7 +2,7 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import create_tables, save_key, approve_and_assign_key, get_stock_count, get_total_users, add_user, get_user_keys
+from database import create_tables, save_key, approve_and_assign_key, add_user, get_user_keys
 from admin_panel import admin_keyboard, admin_game_selection_keyboard, admin_plan_selection_keyboard
 
 logging.basicConfig(level=logging.INFO)
@@ -43,35 +43,28 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Screenshot received!")
         return
 
-    if user_id == ADMIN_ID and state:
-        if text == "🔙 Back to Admin":
-            context.user_data.clear()
+    if user_id == ADMIN_ID:
+        if text == "🛠 Admin Panel":
             await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
             return
+        if text == "🔑 Add Keys":
+            context.user_data["state"] = "awaiting_game"
+            await update.message.reply_text("Choose game:", reply_markup=admin_game_selection_keyboard())
+            return
         if state == "awaiting_game":
-            if text in GAME_PLANS:
-                context.user_data.update({"add_game": text, "state": "awaiting_plan"})
-                await update.message.reply_text("Now choose the plan:", reply_markup=admin_plan_selection_keyboard())
+            context.user_data.update({"add_game": text, "state": "awaiting_plan"})
+            await update.message.reply_text("Now choose the plan:", reply_markup=admin_plan_selection_keyboard())
             return
-        elif state == "awaiting_plan":
+        if state == "awaiting_plan":
             context.user_data.update({"add_plan": text, "state": "awaiting_keys"})
-            await update.message.reply_text("📝 Enter the Keys:")
+            await update.message.reply_text("📝 Enter the Keys (separate by new line):")
             return
-        elif state == "awaiting_keys":
+        if state == "awaiting_keys":
+            from database import save_key
             keys = [k.strip() for k in text.split("\n") if k.strip()]
             for key in keys: save_key(context.user_data["add_game"], key, context.user_data["add_plan"])
             context.user_data.clear()
-            await update.message.reply_text("✅ Saved!", reply_markup=admin_keyboard())
-            return
-
-    if user_id == ADMIN_ID:
-        if text == "🛠 Admin Panel" or text == "🔙 Back to Admin":
-            context.user_data.clear()
-            await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
-            return
-        elif text == "🔑 Add Keys":
-            context.user_data["state"] = "awaiting_game"
-            await update.message.reply_text("Choose game:", reply_markup=admin_game_selection_keyboard())
+            await update.message.reply_text("✅ Keys Saved!", reply_markup=admin_keyboard())
             return
 
     if text == "🎮 Games":
@@ -90,18 +83,21 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     if data.startswith("pay_"):
-        _, g_short, p_short, price = data.split("_")
-        context.user_data.update({"u_game": REV_GAME_MAP[g_short], "u_plan": REV_PLAN_MAP[p_short]})
-        # QR Code फीचर वापस जोड़ दिया है:
+        _, g_s, p_s, price = data.split("_")
+        context.user_data.update({"u_game": REV_GAME_MAP[g_s], "u_plan": REV_PLAN_MAP[p_s]})
         with open("qr.JPG", "rb") as qr:
-            await query.message.reply_photo(photo=qr, caption=f"✅ Plan: {REV_GAME_MAP[g_short]} ({REV_PLAN_MAP[p_short]})\n💰 Amount: ₹{price}\n\n👉 Pay to this QR and **send the screenshot here**.")
+            await query.message.reply_photo(photo=qr, caption=f"✅ Plan: {REV_GAME_MAP[g_s]} ({REV_PLAN_MAP[p_s]})\n💰 Amount: ₹{price}\n\n👉 Pay to this QR and **send the screenshot here**.")
     elif data.startswith("acc_"):
-        _, uid, g_short, p_short = data.split("_")
-        key = approve_and_assign_key(int(uid), REV_GAME_MAP[g_short], REV_PLAN_MAP[p_short])
+        _, uid, g_s, p_s = data.split("_")
+        key = approve_and_assign_key(int(uid), REV_GAME_MAP[g_s], REV_PLAN_MAP[p_s])
         if key:
-            await context.bot.send_message(int(uid), f"✅ Key: `{key}`")
-            await query.edit_message_caption(caption="✅ Approved.")
-        else: await query.edit_message_caption(caption="⚠️ Out of stock!")
+            await context.bot.send_message(int(uid), f"✅ Payment Approved!\n\n🔑 Your Key: `{key}`")
+            await query.edit_message_caption(caption=f"✅ Approved. Key sent: {key}")
+        else: await query.edit_message_caption(caption="⚠️ Error: Out of stock!")
+    elif data.startswith("rej_"):
+        _, uid = data.split("_")
+        await context.bot.send_message(int(uid), "❌ Payment rejected.")
+        await query.edit_message_caption(caption="❌ Rejected.")
 
 def main():
     create_tables()
