@@ -2,7 +2,7 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import create_tables, save_key, approve_and_assign_key, add_user, get_user_keys, get_stock_count, get_total_users, get_all_keys_report
+from database import create_tables, save_key, approve_and_assign_key, get_user_keys, get_stock_count, get_total_users, get_all_keys_report
 
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
@@ -31,16 +31,13 @@ async def message_handler(update, context):
     user_id = update.effective_user.id
     
     if user_id == ADMIN_ID:
-        if text == "🛠 Admin Panel":
-            await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
-        elif text == "👥 Total Users":
-            await update.message.reply_text(f"👥 Total registered users: {get_total_users()}")
+        if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
         elif text == "📜 Key Report":
-            report = "📜 *Full Key Status Report:*\n\n"
+            report = "📜 *Status Report:*\n\n"
             for g, p, k, used, uid in get_all_keys_report():
                 status = "✅ Sold" if used == 1 else "🟢 Available"
-                u_info = f" (User: {uid})" if used == 1 else ""
-                report += f"🎮 {g} | {p}\n🔑 `{k}` | {status}{u_info}\n\n"
+                report += f"🎮 {g} | {p}\n🔑 `{k}` | {status}\n\n"
             await update.message.reply_text(report, parse_mode="Markdown")
         elif text == "📊 Stock":
             msg = "📊 *Current Stock:*\n\n"
@@ -50,17 +47,15 @@ async def message_handler(update, context):
             await update.message.reply_text(msg, parse_mode="Markdown")
         elif text == "🔑 Add Keys":
             context.user_data["state"] = "select_game"
-            kb = [[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]]
-            await update.message.reply_text("Select Game:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+            await update.message.reply_text("Select Game:", reply_markup=ReplyKeyboardMarkup([[g] for g in GAME_PLANS.keys()], resize_keyboard=True))
         elif context.user_data.get("state") == "select_game":
             context.user_data["add_game"] = text
             context.user_data["state"] = "select_plan"
-            kb = [[p] for p in GAME_PLANS[text].keys()] + [["🔙 Back"]]
-            await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+            await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup([[p] for p in GAME_PLANS[text].keys()], resize_keyboard=True))
         elif context.user_data.get("state") == "select_plan":
             context.user_data["add_plan"] = text
             context.user_data["state"] = "add_keys"
-            await update.message.reply_text("Enter keys (one per line):", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
+            await update.message.reply_text("Enter keys (one per line):")
         elif context.user_data.get("state") == "add_keys":
             for k in text.split("\n"):
                 if k.strip(): save_key(context.user_data["add_game"], k.strip(), context.user_data["add_plan"])
@@ -79,7 +74,12 @@ async def message_handler(update, context):
         if not keys: await update.message.reply_text("No keys found!")
         else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
     elif update.message.photo and user_id != ADMIN_ID:
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}")]]))
+        g = context.user_data.get("game", "N/A")
+        p = context.user_data.get("plan", "N/A")
+        # यहाँ बटन में गेम और प्लान का नाम भेज रहे हैं
+        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
+                                     caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", 
+                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}")]]))
         await update.message.reply_text("✅ Screenshot sent!")
 
 async def button_click(update, context):
@@ -95,16 +95,15 @@ async def button_click(update, context):
         plan, price, game = data[1], data[2], context.user_data.get("game")
         context.user_data["plan"] = plan
         invoice_msg = f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 *Pay to this QR and send the screenshot here.*"
-        try:
-            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=invoice_msg, parse_mode="Markdown")
-        except: await query.message.reply_text("⚠️ QR file not found!")
+        with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=invoice_msg, parse_mode="Markdown")
     elif query.data.startswith("acc_"):
-        uid = int(query.data.split("_")[1])
-        key = approve_and_assign_key(uid, context.user_data.get("game"), context.user_data.get("plan"))
+        data = query.data.split("_")
+        uid, game, plan = int(data[1]), data[2], data[3]
+        key = approve_and_assign_key(uid, game, plan)
         if key:
-            await context.bot.send_message(uid, f"✅ *Payment Approved!*\n\n🎮 {context.user_data.get('game')}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
-            await query.edit_message_caption(caption=f"✅ Approved! Key delivered.")
-        else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
+            await context.bot.send_message(uid, f"✅ *Payment Approved!*\n\n🎮 {game}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
+            await query.edit_message_caption(caption=f"✅ Approved! Key: {key}")
+        else: await query.edit_message_caption(caption="⚠️ Error: No keys available for this selection!")
 
 def main():
     create_tables()
