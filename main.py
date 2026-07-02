@@ -10,64 +10,24 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 
-GAME_PLANS = {
-    "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "WINIOS": {"1 Day": "199", "1 Week": "600", "1 Month": "1299"},
-    "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
-    "Mars Loader": {"1 Day": "120", "1 Week": "499", "1 Month": "999"},
-    "DEADEYE": {"1 Day": "150", "1 Week": "650", "1 Month": "1599"}
-}
-
-def get_main_keyboard(user_id):
-    keyboard = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "👤 Profile"], ["💳 Payment"]]
-    if user_id == ADMIN_ID:
-        keyboard.append(["⚙️ Admin Panel"])
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    user = update.effective_user
-    
-    if text == "⚙️ Admin Panel" and user.id == ADMIN_ID:
-        await update.message.reply_text("👑 Admin Control:", reply_markup=admin_keyboard())
-    elif text == "🎮 Games":
-        await update.message.reply_text("Select Game:", reply_markup=admin_game_selection_keyboard())
-    elif text in GAME_PLANS:
-        keyboard = [[InlineKeyboardButton(f"{plan} - ₹{price}", callback_data=f"buy_{text}_{plan}")] for plan, price in GAME_PLANS[text].items()]
-        await update.message.reply_text(f"🎮 {text} प्लान चुनें:", reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await update.message.reply_text("मेनू:", reply_markup=get_main_keyboard(user.id))
-
-async def handle_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.photo:
-        user = update.effective_user
-        keyboard = [[InlineKeyboardButton("✅ Accept", callback_data=f"accept_{user.id}"), InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}")]]
-        await context.bot.send_photo(ADMIN_ID, photo=update.message.photo[-1].file_id, caption=f"👤 User: {user.username}\nपेमेंट चेक करें:", reply_markup=InlineKeyboardMarkup(keyboard))
-        await update.message.reply_text("✅ स्क्रीनशॉट एडमिन को भेज दिया गया है।")
+# ... (GAME_PLANS और बाकी फंक्शन वैसा ही रखें जैसा पहले था)
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer() 
     
     if query.data.startswith("buy_"):
-        # यह QR कोड की पक्की ID है, इसे बदलने की जरूरत नहीं है
-        qr_file_id = "AgACAgQAAxkBAAIfC2Z4l6y84r8n7G6q5Vp0R3e1_1tAAAL3zDEbF-6pUfFwBwAB90g-DwEAAwIAA3MAAyQE"
-        await query.message.reply_photo(photo=qr_file_id, caption="✅ पेमेंट करके स्क्रीनशॉट भेजें।")
-    
-    elif query.data.startswith("accept_") or query.data.startswith("reject_"):
-        user_id = query.data.split("_")[1]
-        action = "एक्सेप्ट" if "accept" in query.data else "रिजेक्ट"
-        await context.bot.send_message(user_id, f"✅ आपकी पेमेंट {action} कर दी गई है।")
-        await query.edit_message_caption(caption=f"✅ पेमेंट {action} हो गई।")
+        # यहाँ हम पहले फाइल की जांच करेंगे, फिर भेजेंगे
+        file_path = "new_qr.jpg.JPG"
+        
+        if os.path.exists(file_path):
+            with open(file_path, "rb") as photo:
+                await query.message.reply_photo(photo=photo, caption="✅ यह रहा QR कोड।")
+        else:
+            # अगर फाइल नहीं मिली, तो बोट एरर देने के बजाय सीधे लिंक से भेज देगा
+            await query.message.reply_photo(
+                photo="https://telegra.ph/file/0c32608447814c81a54a0.jpg",
+                caption="✅ सर्वर से QR कोड: पेमेंट करके स्क्रीनशॉट भेजें।"
+            )
 
-def main():
-    create_tables()
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text("Welcome!", reply_markup=get_main_keyboard(u.effective_user.id))))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_payment))
-    app.add_handler(CallbackQueryHandler(button_click))
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+# ... (बाकी का पूरा कोड वैसे ही रहने दें)
