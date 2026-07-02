@@ -2,7 +2,7 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import create_tables, save_key, approve_and_assign_key, add_user, get_user_keys, get_stock_count, get_total_users
+from database import create_tables, save_key, approve_and_assign_key, add_user, get_user_keys, get_stock_count, get_total_users, get_all_keys_report
 
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
@@ -18,8 +18,7 @@ GAME_PLANS = {
 }
 
 def admin_keyboard():
-    # यहाँ "👥 Total Users" बटन ऐड किया है
-    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["👥 Total Users", "🔙 Back"]], resize_keyboard=True)
+    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📜 Key Report", "👥 Total Users"], ["🔙 Back"]], resize_keyboard=True)
 
 async def start(update, context):
     user_id = update.effective_user.id
@@ -35,13 +34,19 @@ async def message_handler(update, context):
         if text == "🛠 Admin Panel":
             await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "👥 Total Users":
-            count = get_total_users()
-            await update.message.reply_text(f"👥 Total registered users: {count}")
+            await update.message.reply_text(f"👥 Total registered users: {get_total_users()}")
+        elif text == "📜 Key Report":
+            report = "📜 *Full Key Status Report:*\n\n"
+            for g, p, k, used, uid in get_all_keys_report():
+                status = "✅ Sold" if used == 1 else "🟢 Available"
+                u_info = f" (User: {uid})" if used == 1 else ""
+                report += f"🎮 {g} | {p}\n🔑 `{k}` | {status}{u_info}\n\n"
+            await update.message.reply_text(report, parse_mode="Markdown")
         elif text == "📊 Stock":
             msg = "📊 *Current Stock:*\n\n"
-            for game, plans in GAME_PLANS.items():
-                msg += f"*{game}:*\n"
-                for p in plans: msg += f"  - {p}: {get_stock_count(game, p)} keys\n"
+            for g, plans in GAME_PLANS.items():
+                msg += f"*{g}:*\n"
+                for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
             await update.message.reply_text(msg, parse_mode="Markdown")
         elif text == "🔑 Add Keys":
             context.user_data["state"] = "select_game"
