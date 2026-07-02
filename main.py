@@ -8,12 +8,13 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
 
+# आपकी गेम लिस्ट
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
     "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
     "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
     "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "130", "1 Week": "599"},
-    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
+    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
     "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
 }
 
@@ -28,6 +29,7 @@ async def message_handler(update, context):
     user_id = update.effective_user.id
     state = context.user_data.get("state")
 
+    # एडमिन फ्लो
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel":
             await update.message.reply_text("Admin Panel:", reply_markup=ReplyKeyboardMarkup([["🔑 Add Keys"], ["🔙 Back"]], resize_keyboard=True))
@@ -53,6 +55,7 @@ async def message_handler(update, context):
             context.user_data.clear()
             await start(update, context)
 
+    # यूजर फ्लो
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -64,22 +67,31 @@ async def message_handler(update, context):
 
 async def button_click(update, context):
     query = update.callback_query
-    # यह सबसे महत्वपूर्ण लाइन है जो लोडिंग खत्म करेगी
-    await query.answer() 
+    await query.answer() # फास्ट रिस्पॉन्स के लिए
     
     if query.data.startswith("game_"):
         game = query.data.split("_")[1]
         kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{game}_{p}")] for p, pr in GAME_PLANS[game].items()]
         await query.message.reply_text("Select Plan:", reply_markup=InlineKeyboardMarkup(kb))
+        
     elif query.data.startswith("pay_"):
-        # यहाँ आपका QR वाला पुराना लॉजिक काम करेगा
         try:
             with open("qr.JPG", "rb") as qr:
-                await query.message.reply_photo(photo=qr, caption="Pay and send screenshot.")
+                await query.message.reply_photo(photo=qr, caption="Please pay and send the screenshot.")
         except:
             await query.message.reply_text("⚠️ QR file not found!")
+            
     elif query.data.startswith("acc_"):
-        await query.edit_message_caption("✅ Approved and Key delivered.")
+        user_id = int(query.data.split("_")[1])
+        # यहाँ की-डिलीवरी का लॉजिक जोड़ने के लिए approve_and_assign_key का यूज़ किया है
+        # सुनिश्चित करें कि आपके डेटाबेस फंक्शन में यही नाम है
+        key = approve_and_assign_key(user_id, "DEFAULT_GAME", "1 Day") 
+        
+        if key:
+            await context.bot.send_message(user_id, f"✅ Payment Approved!\n🔑 Your Key: `{key}`", parse_mode="Markdown")
+            await query.edit_message_caption("✅ Approved and Key delivered.")
+        else:
+            await query.edit_message_caption("⚠️ Error: No keys available in stock!")
 
 def main():
     create_tables()
