@@ -14,14 +14,15 @@ def create_tables():
     )
     """)
     
-    # Keys Table (Updated with plan column)
+    # Keys Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS keys (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         game_name TEXT,
         key_code TEXT,
         plan TEXT,
-        is_used INTEGER DEFAULT 0
+        is_used INTEGER DEFAULT 0,
+        user_id INTEGER DEFAULT NULL
     )
     """)
     
@@ -36,13 +37,6 @@ def create_tables():
     )
     """)
     
-    # Automatically add 'plan' column if the database already exists on Railway
-    try:
-        cursor.execute("ALTER TABLE keys ADD COLUMN plan TEXT")
-    except sqlite3.OperationalError:
-        # Column already exists, do nothing
-        pass
-    
     conn.commit()
     conn.close()
 
@@ -53,13 +47,22 @@ def add_user(user_id, username):
     conn.commit()
     conn.close()
 
-# Updated to take 3 parameters (game_name, key_code, plan)
 def save_key(game_name, key_code, plan):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO keys (game_name, key_code, plan) VALUES (?, ?, ?)", (game_name, key_code, plan))
+    cursor.execute("INSERT INTO keys (game_name, key_code, plan, is_used) VALUES (?, ?, ?, 0)", (game_name, key_code, plan))
     conn.commit()
     conn.close()
+
+# यह नया फंक्शन है जो आपके मेन कोड की एरर ठीक करेगा
+def get_user_keys(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    # यह उन keys को निकालेगा जो इस यूजर को असाइन की गई हैं
+    cursor.execute("SELECT key_code FROM keys WHERE user_id = ?", (user_id,))
+    keys = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return keys
 
 def get_stock(game_name=None):
     conn = sqlite3.connect(DB_NAME)
@@ -68,7 +71,6 @@ def get_stock(game_name=None):
         cursor.execute("SELECT COUNT(*) FROM keys WHERE game_name = ? AND is_used = 0", (game_name,))
         count = cursor.fetchone()[0]
     else:
-        # Total stock of all games
         cursor.execute("SELECT COUNT(*) FROM keys WHERE is_used = 0")
         count = cursor.fetchone()[0]
     conn.close()
