@@ -1,84 +1,161 @@
 import os
 import logging
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import create_tables, save_key, approve_and_assign_key, get_stock_count, get_total_users, add_user
-from admin_panel import admin_keyboard, admin_game_selection_keyboard, admin_plan_selection_keyboard
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters,
+)
+
+from database import (
+    create_tables,
+    add_user,
+    add_payment,
+    get_payment,
+    approve_payment,
+    assign_key,
+)
 
 logging.basicConfig(level=logging.INFO)
+
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 7908981593
 
+# ---------------- GAME DATA ----------------
 GAME_PLANS = {
-    "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "WINIOS": {"1 Day": "199", "1 Week": "600", "1 Month": "1299"},
-    "NEXT IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"}
+    "KING iOS": ["1 Day", "1 Week", "1 Month"],
+    "WINIOS": ["1 Day", "1 Week", "1 Month"],
+    "NEXT IOS": ["1 Day", "1 Week", "1 Month"],
 }
 
+# ---------------- MEMORY (safe + simple) ----------------
+USER_STATE = {}
+
+# ---------------- START ----------------
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    add_user(user.id, user.username or "unknown")
+
+    await update.message.reply_text(
+        "🎮 Welcome!\nSend *Games* to start.",
+        parse_mode="Markdown"
+    )
+
+# ---------------- MESSAGE HANDLER ----------------
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    user_id = update.effective_user.id
-    
-    # --- ADMIN FLOW ---
-    if user_id == ADMIN_ID:
-        # (आपका एडमिन लॉजिक यहाँ वैसा ही रहेगा)
-        if text == "📦 Stock":
-            msg = "📦 Stock:\n" + "\n".join([f"{g}: {sum([get_stock_count(g, p) for p in GAME_PLANS[g]])} left" for g in GAME_PLANS])
-            await update.message.reply_text(msg)
+    uid = update.effective_user.id
+
+    # auto-add user
+    add_user(uid, update.effective_user.username or "unknown")
+
+    # avoid crash
+    text = update.message.text if update.message.text else ""
+
+    # ---------------- GAME SELECT ----------------
+    if text in GAME_PLANS:
+        USER_STATE[uid] = {"game": text}
+
+        kb = [
+            [InlineKeyboardButton(p, callback_data=f"plan|{p}")]
+            for p in GAME_PLANS[text]
+        ]
+
+        await update.message.reply_text(
+            "📦 Select Plan:",
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
         return
 
-    # --- USER PAYMENT SCREENSHOT ---
-    if update.message.photo and user_id != ADMIN_ID:
-        game = context.user_data.get("last_game", "N/A")
-        plan = context.user_data.get("last_plan", "N/A")
-        # सुरक्षित callback data: acc_userid_gamename_planname
-        callback_acc = f"acc_{user_id}_{game}_{plan}"
-        
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
-            caption=f"Payment from {user_id}\nGame: {game}\nPlan: {plan}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=callback_acc), InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}")]]))
-        await update.message.reply_text("✅ Screenshot sent to Admin!")
+    # ---------------- PAYMENT SCREENSHOT ----------------
+    if update.message.photo and uid != ADMIN_ID:
+        state = USER_STATE.get(uid, {})
+        game = state.get("game", "NA")
+        plan = state.get("plan", "NA")
+
+        payment_id = add_payment(uid, game, plan)
+
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("✅ Approve", callback_data=f"acc|{payment_id}"),
+            InlineKeyboardButton("❌ Reject", callback_data=f"rej|{payment_id}")
+        ]])
+
+        await context.bot.send_photo(
+            ADMIN_ID,
+            update.message.photo[-1].file_id,
+            caption=f"💰 Payment #{payment_id}\nUser: {uid}\nGame: {game}\nPlan: {plan}",
+            reply_markup=kb
+        )
+
+        await update.message.reply_text("✅ Payment sent to admin.")
         return
 
-    # --- GAME SELECTION ---
-    if text == "🎮 Games": await update.message.reply_text("Select game:", reply_markup=admin_game_selection_keyboard())
-    elif text in GAME_PLANS:
-        context.user_data["last_game"] = text
-        kb = [[InlineKeyboardButton(f"{p}", callback_data=f"plan_{p}")] for p in GAME_PLANS[text]]
-        await update.message.reply_text("Select plan:", reply_markup=InlineKeyboardMarkup(kb))
-
+# ---------------- CALLBACK HANDLER ----------------
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-    
-    if data.startswith("plan_"):
-        context.user_data["last_plan"] = data.split("_")[1]
-        if os.path.exists("qr.JPG"): await query.message.reply_photo(open("qr.JPG", "rb"), caption="Send screenshot.")
-    
-    elif data.startswith("acc_"):
-        # ऑटो-की डिलीवरी का असली लॉजिक:
-        _, uid, game, plan = data.split("_", 3)
-        key = approve_and_assign_key(int(uid), game, plan) # int(uid) सुरक्षा के लिए
+    q = update.callback_query
+    await q.answer()  # important fix
+
+    data = q.data
+
+    # ---------------- PLAN SELECT ----------------
+    if data.startswith("plan|"):
+        plan = data.split("|")[1]
+        uid = q.from_user.id
+
+        if uid in USER_STATE:
+            USER_STATE[uid]["plan"] = plan
+
+        await q.message.reply_text("📸 Now send payment screenshot.")
+        return
+
+    # ---------------- APPROVE ----------------
+    if data.startswith("acc|"):
+        pid = int(data.split("|")[1])
+
+        payment = get_payment(pid)
+        if not payment:
+            await q.edit_message_caption("❌ Payment not found")
+            return
+
+        uid, game, plan = payment
+
+        key = assign_key(uid, game, plan)
+
         if key:
-            await context.bot.send_message(int(uid), f"✅ Approved! Key: `{key}`", parse_mode="Markdown")
-            await query.edit_message_caption(caption=f"✅ Approved & Sent: {key}")
+            approve_payment(pid)
+
+            await context.bot.send_message(
+                uid,
+                f"🎉 Approved!\n\n🔑 Your Key:\n`{key}`",
+                parse_mode="Markdown"
+            )
+
+            await q.edit_message_caption("✅ Approved & Key Sent")
         else:
-            await context.bot.send_message(int(uid), "❌ Sorry, no keys left.")
-            await query.edit_message_caption(caption="❌ Rejected (Out of Stock).")
+            await q.edit_message_caption("❌ No stock available")
 
-    elif data.startswith("rej_"):
-        uid = data.split("_")[1]
-        await context.bot.send_message(uid, "❌ Rejected.")
-        await query.edit_message_caption(caption="❌ Rejected.")
+        return
 
+    # ---------------- REJECT ----------------
+    if data.startswith("rej|"):
+        pid = int(data.split("|")[1])
+        await q.edit_message_caption("❌ Rejected")
+        return
+
+# ---------------- MAIN ----------------
 def main():
     create_tables()
+
     app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", lambda u, c: start(u, c)))
+
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
+
+    print("Bot is running...")
     app.run_polling()
+
+if __name__ == "__main__":
+    main()
