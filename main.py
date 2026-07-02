@@ -5,11 +5,20 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from database import create_tables, save_key, approve_and_assign_key, get_stock_count, get_total_users, add_user, get_user_keys
 from admin_panel import admin_keyboard, admin_game_selection_keyboard, admin_plan_selection_keyboard
 
-logging.basicConfig(level=logging.INFO)
+# Logging setup
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = "7908981593"
 
-# Mapping for callback data (Keep it short to avoid telegram errors)
+GAME_PLANS = {
+    "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
+    "WINIOS": {"1 Day": "199", "1 Week": "600", "1 Month": "1299"},
+    "NEXT IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
+    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
+    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
+    "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"}
+}
+
 GAME_MAP = {"👑 KING iOS": "KING", "WINIOS": "WIN", "NEXT IOS": "NEXT", "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": "MARS", "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙔𝙀": "DEAD", "DOLPHIN IOS": "DOLP"}
 REV_GAME_MAP = {v: k for k, v in GAME_MAP.items()}
 PLAN_MAP = {"1 Day": "1D", "1 Week": "1W", "1 Month": "1M"}
@@ -23,45 +32,92 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Welcome! How can I help you today?", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. PHOTO HANDLING (Priority)
-    if update.message.photo:
-        user_id = str(update.effective_user.id)
-        if user_id == ADMIN_ID:
-            await update.message.reply_text("⚠️ You are admin, you can't send payment screenshots here.")
-            return
-        
-        g = context.user_data.get("u_game", "Unknown")
-        p = context.user_data.get("u_plan", "Unknown")
-        
-        await context.bot.send_photo(
-            chat_id=ADMIN_ID,
-            photo=update.message.photo[-1].file_id, 
-            caption=f"👤 Payment from: {update.effective_user.first_name} (@{update.effective_user.username or 'N/A'})\nID: {user_id}\n🎮 Game: {g}\n📦 Plan: {p}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ Accept & Send Key", callback_data=f"acc_{user_id}_{GAME_MAP.get(g, 'KING')}_{PLAN_MAP.get(p, '1D')}")],
-                [InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}")]
-            ])
-        )
-        await update.message.reply_text("✅ Screenshot received! Admin is verifying.")
+    user_id = str(update.effective_user.id)
+    
+    # Photo handling for payment
+    if update.message.photo and user_id != ADMIN_ID:
+        g = context.user_data.get("u_game", "👑 KING iOS")
+        p = context.user_data.get("u_plan", "1 Day")
+        await context.bot.send_photo(chat_id=ADMIN_ID, photo=update.message.photo[-1].file_id, 
+            caption=f"👤 Payment from {user_id}\n🎮 Game: {g}\n📦 Plan: {p}",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept & Send Key", callback_data=f"acc_{user_id}_{GAME_MAP[g]}_{PLAN_MAP[p]}")], [InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}")]]))
+        await update.message.reply_text("✅ Screenshot received! Admin is verifying your payment.")
         return
 
-    # 2. TEXT HANDLING
     text = update.message.text
-    user_id = str(update.effective_user.id)
     state = context.user_data.get("state")
 
-    # Admin Add Keys Flow
+    # Admin logic
     if user_id == ADMIN_ID and state:
-        # ... (Same Add Key logic as before) ...
-        # [Include the same Add Keys logic code block here]
-        pass 
+        if text == "🔙 Back to Admin":
+            context.user_data.clear()
+            await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        elif state == "awaiting_game" and text in GAME_PLANS:
+            context.user_data.update({"add_game": text, "state": "awaiting_plan"})
+            await update.message.reply_text(f"🎮 Selected: {text}\nChoose the plan:", reply_markup=admin_plan_selection_keyboard())
+        elif state == "awaiting_plan":
+            clean_plan = text.replace("🟢 ", "").replace("🟡 ", "").replace("🔴 ", "").strip()
+            context.user_data.update({"add_plan": clean_plan, "state": "awaiting_keys"})
+            await update.message.reply_text(f"📝 Enter keys for {context.user_data['add_game']} ({clean_plan}):")
+        elif state == "awaiting_keys":
+            keys = [k.strip() for k in text.split("\n") if k.strip()]
+            for key in keys: save_key(context.user_data['add_game'], key, context.user_data['add_plan'])
+            context.user_data.clear()
+            await update.message.reply_text("✅ Keys saved!", reply_markup=admin_keyboard())
+        return
 
-    # Buttons Logic (Keep all existing buttons)
-    if text == "🎮 Games":
-        await update.message.reply_text("Choose a game:", reply_markup=admin_game_selection_keyboard())
-    elif text in ["👑 KING iOS", "WINIOS", "NEXT IOS", "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫", "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙔𝙀", "DOLPHIN IOS"]:
-        context.user_data["u_game"] = text
-        # ... (Show plans inline) ...
-    # ... (Rest of your existing text buttons) ...
+    if user_id == ADMIN_ID:
+        if text in ["🛠 Admin Panel", "🔙 Back to Admin"]:
+            context.user_data.clear()
+            await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        elif text == "🔑 Add Keys":
+            context.user_data["state"] = "awaiting_game"
+            await update.message.reply_text("🎮 Choose game:", reply_markup=admin_game_selection_keyboard())
+        elif text == "📦 Stock":
+            msg = "📦 Stock:\n" + "\n".join([f"{g}: {get_stock_count(g, '1 Day')} (1D), {get_stock_count(g, '1 Week')} (1W), {get_stock_count(g, '1 Month')} (1M)" for g in GAME_PLANS])
+            await update.message.reply_text(msg)
+        return
 
-# [Include the rest of the button_click and main functions]
+    # Customer logic
+    if text == "🎮 Games": await update.message.reply_text("Choose a game:", reply_markup=admin_game_selection_keyboard())
+    elif text in GAME_PLANS:
+        keyboard = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{GAME_MAP[text]}_{PLAN_MAP[p]}_{pr}")] for p, pr in GAME_PLANS[text].items()]
+        await update.message.reply_text(f"🎮 Select your plan for {text}:", reply_markup=InlineKeyboardMarkup(keyboard))
+    elif text == "🔑 My Keys":
+        my_keys = get_user_keys(update.effective_user.id)
+        msg = "🔑 **Your Keys:**\n" + "\n".join([f"🎮 {gk} ({pk}): `{kcode}`" for gk, pk, kcode in my_keys]) if my_keys else "❌ No keys found."
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    elif text == "📞 Support": await update.message.reply_text("📞 Contact: @IOS_HACK_S")
+    else: await start(update, context)
+
+async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    if data.startswith("pay_"):
+        _, g_short, p_short, price = data.split("_")
+        context.user_data.update({"u_game": REV_GAME_MAP[g_short], "u_plan": REV_PLAN_MAP[p_short]})
+        with open("qr.JPG", "rb") as qr:
+            await query.message.reply_photo(qr, caption=f"✅ {REV_GAME_MAP[g_short]} ({REV_PLAN_MAP[p_short]})\n💰 Amount: ₹{price}\n\n👉 Pay to QR and send screenshot.")
+    elif data.startswith("acc_"):
+        _, uid, g_short, p_short = data.split("_")
+        key = approve_and_assign_key(int(uid), REV_GAME_MAP[g_short], REV_PLAN_MAP[p_short])
+        if key:
+            await context.bot.send_message(int(uid), f"✅ Approved!\n\n🎮 {REV_GAME_MAP[g_short]}\n🔑 Key: `{key}`")
+            await query.edit_message_caption(caption="✅ Approved.")
+        else: await query.edit_message_caption(caption="⚠️ Error: Out of stock!")
+    elif data.startswith("rej_"):
+        await context.bot.send_message(int(data.split("_")[1]), "❌ Payment Rejected.")
+        await query.edit_message_caption(caption="❌ Rejected.")
+
+def main():
+    create_tables()
+    app = Application.builder().token(TOKEN).concurrent_updates(True).build() # .concurrent_updates added
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, message_handler))
+    app.add_handler(CallbackQueryHandler(button_click))
+    print("Bot is running...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
