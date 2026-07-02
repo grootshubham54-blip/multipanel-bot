@@ -1,21 +1,12 @@
 import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, CallbackQueryHandler, 
-    ContextTypes, filters
-)
-# अपनी database.py और admin_panel.py को उसी फोल्डर में रखें
-from database import (
-    create_tables, add_user, save_pending_payment, 
-    approve_and_assign_key, get_user_keys
-)
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from database import create_tables, add_user, save_pending_payment, approve_and_assign_key, get_user_keys
 from admin_panel import admin_keyboard, admin_game_selection_keyboard
 
-# Logging सेटअप
-logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 7908981593 # Integer में ही रखें
+ADMIN_ID = 7908981593 
 
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "199", "1 Week": "800", "1 Month": "2000"},
@@ -40,19 +31,16 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text or ""
     user_id = update.effective_user.id
     
-    # 1. पेमेंट फोटो हैंडलिंग
     if update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("u_game", "Unknown")
         p = context.user_data.get("u_plan", "Unknown")
         pay_id = save_pending_payment(user_id, g, p, update.message.photo[-1].file_id)
-        
         await context.bot.send_photo(chat_id=ADMIN_ID, photo=update.message.photo[-1].file_id, 
             caption=f"👤 Payment from {user_id}\n🎮 {g} - {p}",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Approve", callback_data=f"acc_{pay_id}")]]))
         await update.message.reply_text("✅ Payment sent for approval!")
         return
 
-    # 2. बटन्स लॉजिक (बटन गायब न हों इसके लिए यह स्ट्रक्चर सुरक्षित है)
     if text == "🛠 Admin Panel" and user_id == ADMIN_ID:
         await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
     elif text == "🎮 Games":
@@ -71,14 +59,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
     if "plan|" in query.data:
         context.user_data["u_plan"] = query.data.split("|")[1]
-        if os.path.exists("qr.JPG"):
-            with open("qr.JPG", "rb") as qr:
-                await query.message.reply_photo(photo=qr, caption="Send payment screenshot.")
-        else: await query.message.reply_text("QR image not found.")
-            
+        await query.message.reply_text("Please send payment screenshot.")
     elif query.data.startswith("acc_"):
         pay_id = int(query.data.split("_")[1])
         key, uid = approve_and_assign_key(pay_id)
