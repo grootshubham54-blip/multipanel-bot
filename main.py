@@ -1,15 +1,25 @@
 import os
 import logging
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, MessageHandler, CallbackQueryHandler, CommandHandler, filters, ContextTypes
-from database import create_tables, approve_and_assign_key, get_stock_count, get_total_users, add_user
+import sqlite3
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import (
+    Application,
+    MessageHandler,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    filters
+)
+
+from database import create_tables, approve_and_assign_key
 from admin_panel import admin_keyboard, admin_game_selection_keyboard, admin_plan_selection_keyboard
 
 logging.basicConfig(level=logging.INFO)
+
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 7908981593
 
-# आपका पुराना गेम प्लान स्ट्रक्चर (बिल्कुल वैसा ही है)
+# ---------------- GAME PLANS ----------------
 GAME_PLANS = {
     "👑 KING iOS": ["1 Day", "1 Week", "1 Month"],
     "WINIOS": ["1 Day", "1 Week", "1 Month"],
@@ -19,57 +29,139 @@ GAME_PLANS = {
     "DOLPHIN IOS": ["1 Day", "1 Week", "1 Month"]
 }
 
+# ---------------- USER STATE ----------------
+USER_STATE = {}
+
+# ---------------- START ----------------
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = ReplyKeyboardMarkup(
+        [["🎮 Games"]],
+        resize_keyboard=True
+    )
+    await update.message.reply_text("Welcome! Click below to start.", reply_markup=keyboard)
+
+# ---------------- MESSAGE HANDLER ----------------
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text
-    
-    # पुरानी फंक्शनैलिटी बरकरार (Admin & User flow)
-    if update.message.photo and user_id != ADMIN_ID:
-        game = context.user_data.get("last_game", "Unknown")
-        plan = context.user_data.get("last_plan", "Unknown")
-        
-        # FIX 1: CALLBACK LIMIT फिक्स करने के लिए डेटा को context में स्टोर किया
-        context.user_data[f"pay_{user_id}"] = {"game": game, "plan": plan}
-        callback_data = f"acc_{user_id}" 
-        
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
-            caption=f"Payment from {user_id}\nGame: {game}\nPlan: {plan}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Approve", callback_data=callback_data)]]))
-        await update.message.reply_text("✅ Screenshot sent!")
+    if not update.message:
         return
 
-    # बाकी का पुराना लॉजिक वैसे ही रहने दिया है
-    if text == "🎮 Games":
-        await update.message.reply_text("Select game:", reply_markup=admin_game_selection_keyboard())
-    elif text in GAME_PLANS:
-        context.user_data["last_game"] = text
-        await update.message.reply_text("Select plan:", reply_markup=admin_plan_selection_keyboard())
+    user_id = update.effective_user.id
+    text = update.message.text
 
+    # ---------------- ADMIN ----------------
+    if user_id == ADMIN_ID:
+        if text == "🛠 Admin Panel":
+            await update.message.reply_text("Admin Panel", reply_markup=admin_keyboard())
+
+        elif text == "📦 Stock":
+            await update.message.reply_text("Stock checked.")
+
+        return
+
+    # ---------------- GAME SELECT ----------------
+    if text == "🎮 Games":
+        await update.message.reply_text(
+            "Select Game:",
+            reply_markup=admin_game_selection_keyboard()
+        )
+        return
+
+    # ---------------- GAME STORE ----------------
+    if text in GAME_PLANS:
+        USER_STATE[user_id] = {"game": text}
+
+        buttons = [
+            [InlineKeyboardButton(plan, callback_data=f"plan|{plan}")]
+            for plan in GAME_PLANS[text]
+        ]
+
+        await update.message.reply_text(
+            "Select Plan:",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+
+    # ---------------- PAYMENT SCREENSHOT ----------------
+    elif update.message.photo:
+        state = USER_STATE.get(user_id, {})
+
+        game = state.get("game", "Unknown")
+        plan = state.get("plan", "Unknown")
+
+        # store state safe (NO callback overflow issue)
+        context.user_data[f"pay_{user_id}"] = {
+            "game": game,
+            "plan": plan
+        }
+
+        callback_data = f"acc|{user_id}"
+
+        await context.bot.send_photo(
+            ADMIN_ID,
+            update.message.photo[-1].file_id,
+            caption=f"Payment\nUser: {user_id}\nGame: {game}\nPlan: {plan}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅ Approve", callback_data=callback_data)
+            ]])
+        )
+
+        await update.message.reply_text("Payment sent to admin ✔️")
+
+# ---------------- CALLBACK HANDLER ----------------
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    # FIX 2: Loading spinner हटाने के लिए जरूरी
-    await query.answer() 
-    data = query.data
-    
-    if data.startswith("acc_"):
-        # FIX 3: डेटा state से उठाएं (Callback Limit Fix)
-        uid = int(data.split("_")[1])
-        pay_info = context.user_data.get(f"pay_{uid}")
-        
-        if pay_info:
-            key = approve_and_assign_key(uid, pay_info["game"], pay_info["plan"])
-            if key:
-                # FIX 4: Markdown का उपयोग करके की (Key) को साफ़ दिखाना
-                await context.bot.send_message(uid, f"✅ Approved! Key: `{key}`", parse_mode="Markdown")
-                await query.edit_message_caption(caption="✅ Approved.")
-            else:
-                await query.edit_message_caption(caption="❌ No keys available.")
+    await query.answer()
 
+    data = query.data
+
+    # ---------------- PLAN SELECT ----------------
+    if data.startswith("plan|"):
+        plan = data.split("|")[1]
+        user_id = query.from_user.id
+
+        if user_id in USER_STATE:
+            USER_STATE[user_id]["plan"] = plan
+
+        await query.message.reply_photo(
+            photo=open("qr.JPG", "rb"),
+            caption="Send payment screenshot now"
+        )
+        return
+
+    # ---------------- APPROVE PAYMENT ----------------
+    if data.startswith("acc|"):
+        user_id = int(data.split("|")[1])
+
+        pay_info = context.user_data.get(f"pay_{user_id}")
+
+        if not pay_info:
+            await query.edit_message_caption("❌ No payment data found")
+            return
+
+        game = pay_info["game"]
+        plan = pay_info["plan"]
+
+        key = approve_and_assign_key(user_id, game, plan)
+
+        if key:
+            await context.bot.send_message(
+                user_id,
+                f"🎉 Approved!\nYour Key:\n`{key}`",
+                parse_mode="Markdown"
+            )
+            await query.edit_message_caption("✅ Approved & Sent")
+        else:
+            await query.edit_message_caption("❌ Out of stock")
+
+# ---------------- MAIN ----------------
 def main():
     create_tables()
+
     app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
+
     app.run_polling()
 
 if __name__ == "__main__":
