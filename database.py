@@ -96,4 +96,3 @@ def update_payment_status(payment_id, status):
     cursor.execute("UPDATE payments SET status = ? WHERE id = ?", (status, payment_id))
     conn.commit()
     conn.close()
- इसमें जो भी चेंजेस करना है, कर दो और मुझे कोड पूरा सेंड कर दो।
