@@ -12,20 +12,27 @@ def create_tables():
     conn.commit()
     conn.close()
 
-def get_user_keys(user_id):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=? AND used=1", (user_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
 def add_user(user_id, username):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
     conn.commit()
     conn.close()
+
+def save_key(game, plan, key):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO keys (game, plan, key) VALUES (?, ?, ?)", (game, plan, key))
+    conn.commit()
+    conn.close()
+
+def get_user_keys(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=? AND used=1", (user_id,))
+    keys = cur.fetchall()
+    conn.close()
+    return keys
 
 def save_pending_payment(user_id, game, plan, photo_file_id):
     conn = get_conn()
