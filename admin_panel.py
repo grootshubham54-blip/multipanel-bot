@@ -1,9 +1,9 @@
-From telegram import ReplyKeyboardMarkup
+from telegram import ReplyKeyboardMarkup
 
 def admin_keyboard():
     keyboard = [
         ["🔑 Add Keys", "📦 Stock"],
-        ["📢 Broadcast"],  # नया बटन
+        ["📢 Broadcast"],
         ["👥 Total Users", "💰 Purchases", "📊 Statistics"],
         ["🔙 Back to Main"]
     ]
