@@ -128,34 +128,63 @@ async def message_handler(update, context):
         )
 
     elif text == "👑 KING iOS":
-        await update.message.reply_text(
-            f"👑 KING iOS\nAvailable Keys: {get_stock('👑 KING iOS')}"
-        )
+    stock = get_stock("👑 KING iOS")
+    await update.message.reply_text(
+        f"👑 KING iOS\n\n"
+        f"💰 1 DAY : ₹200\n"
+        f"💰 1 WEEK : ₹800\n"
+        f"💰 1 MONTH : ₹2000\n\n"
+        f"📦 Available Keys: {stock}"
+    )
 
-    elif text == "WINIOS":
-        await update.message.reply_text(
-            f"WINIOS\nAvailable Keys: {get_stock('WINIOS')}"
-        )
+elif text == "WINIOS":
+    stock = get_stock("WINIOS")
+    await update.message.reply_text(
+        f"WINIOS\n\n"
+        f"💰 1 DAY : ₹199\n"
+        f"💰 1 WEEK : ₹600\n"
+        f"💰 1 MONTH : ₹1399\n\n"
+        f"📦 Available Keys: {stock}"
+    )
 
-    elif text == "NEXT IOS":
-        await update.message.reply_text(
-            f"NEXT IOS\nAvailable Keys: {get_stock('NEXT IOS')}"
-        )
+elif text == "NEXT IOS":
+    stock = get_stock("NEXT IOS")
+    await update.message.reply_text(
+        f"NEXT IOS\n\n"
+        f"💰 1 DAY : ₹200\n"
+        f"💰 1 WEEK : ₹799\n\n"
+        f"📦 Available Keys: {stock}"
+    )
 
-    elif text == "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫":
-        await update.message.reply_text(
-            f"𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫\nAvailable Keys: {get_stock('𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫')}"
-        )
+elif text == "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫":
+    stock = get_stock("𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫")
+    await update.message.reply_text(
+        f"🚀 Mars Loader\n\n"
+        f"💰 1 DAY : ₹120\n"
+        f"💰 1 WEEK : ₹500\n"
+        f"💰 1 MONTH : ₹999\n\n"
+        f"📦 Available Keys: {stock}"
+    )
 
-    elif text == "𝘿𝙀𝘼𝘿𝙀𝙔𝙀":
-        await update.message.reply_text(
-            f"𝘿𝙀𝘼𝘿𝙀𝙔𝙀\nAvailable Keys: {get_stock('𝘿𝙀𝘼𝘿𝙀𝙔𝙀')}"
-        )
+elif text == "𝘿𝙀𝘼𝘿𝙀𝙔𝙀":
+    stock = get_stock("𝘿𝙀𝘼𝘿𝙀𝙔𝙀")
+    await update.message.reply_text(
+        f"🎯 DEADEYE\n\n"
+        f"💰 1 DAY : ₹150\n"
+        f"💰 1 WEEK : ₹600\n"
+        f"💰 1 MONTH : ₹1500\n\n"
+        f"📦 Available Keys: {stock}"
+    )
 
-    elif text == "DOLPHIN IOS":
-        await update.message.reply_text(
-            f"DOLPHIN IOS\nAvailable Keys: {get_stock('DOLPHIN IOS')}"
-        )
+elif text == "DOLPHIN IOS":
+    stock = get_stock("DOLPHIN IOS")
+    await update.message.reply_text(
+        f"🐬 DOLPHIN IOS\n\n"
+        f"💰 1 DAY : ₹200\n"
+        f"💰 1 WEEK : ₹800\n"
+        f"💰 1 MONTH : ₹1600\n\n"
+        f"📦 Available Keys: {stock}"
+    )
 
     elif text == "🔑 My Keys":
         await update.message.reply_text("🔑 My Keys")
