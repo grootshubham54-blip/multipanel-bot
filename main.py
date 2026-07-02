@@ -13,7 +13,7 @@ GAME_PLANS = {
     "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
     "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
     "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "130", "1 Week": "599"},
-    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
+    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
     "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
 }
 
@@ -64,13 +64,20 @@ async def message_handler(update, context):
 
 async def button_click(update, context):
     query = update.callback_query
-    # यह लाइन लोडिंग चक्र को तुरंत हटा देगी
+    # यह सबसे महत्वपूर्ण लाइन है जो लोडिंग खत्म करेगी
     await query.answer() 
     
     if query.data.startswith("game_"):
         game = query.data.split("_")[1]
         kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{game}_{p}")] for p, pr in GAME_PLANS[game].items()]
         await query.message.reply_text("Select Plan:", reply_markup=InlineKeyboardMarkup(kb))
+    elif query.data.startswith("pay_"):
+        # यहाँ आपका QR वाला पुराना लॉजिक काम करेगा
+        try:
+            with open("qr.JPG", "rb") as qr:
+                await query.message.reply_photo(photo=qr, caption="Pay and send screenshot.")
+        except:
+            await query.message.reply_text("⚠️ QR file not found!")
     elif query.data.startswith("acc_"):
         await query.edit_message_caption("✅ Approved and Key delivered.")
 
