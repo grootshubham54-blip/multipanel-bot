@@ -1,5 +1,6 @@
 import os
 import logging
+import sqlite3
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from database import create_tables, save_key, approve_and_assign_key, add_user, get_user_keys
@@ -8,7 +9,6 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
 
-# आपकी पूरी लिस्ट
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
     "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
@@ -19,9 +19,9 @@ GAME_PLANS = {
 }
 
 async def start(update, context):
-    user_id = update.effective_user.id
+    add_user(update.effective_user.id, update.effective_user.username or "User")
     kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
-    if user_id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
+    if update.effective_user.id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
     await update.message.reply_text("👋 Welcome!", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def message_handler(update, context):
@@ -29,51 +29,42 @@ async def message_handler(update, context):
     user_id = update.effective_user.id
     state = context.user_data.get("state")
 
-    # एडमिन फ्लो
     if user_id == ADMIN_ID:
-        if text == "🛠 Admin Panel":
-            await update.message.reply_text("Admin Panel:", reply_markup=ReplyKeyboardMarkup([["🔑 Add Keys"], ["🔙 Back"]], resize_keyboard=True))
+        if text == "🛠 Admin Panel": await update.message.reply_text("Admin:", reply_markup=ReplyKeyboardMarkup([["🔑 Add Keys"], ["🔙 Back"]], resize_keyboard=True))
         elif text == "🔑 Add Keys":
             context.user_data["state"] = "select_game"
-            kb = [[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]]
-            await update.message.reply_text("Select Game:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+            await update.message.reply_text("Select Game:", reply_markup=ReplyKeyboardMarkup([[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]], resize_keyboard=True))
         elif state == "select_game" and text in GAME_PLANS:
-            context.user_data["add_game"] = text
-            context.user_data["state"] = "select_plan"
-            kb = [[p] for p in GAME_PLANS[text].keys()] + [["🔙 Back"]]
-            await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
-        elif state == "select_plan" and text in ["1 Day", "1 Week", "1 Month"]:
-            context.user_data["add_plan"] = text
-            context.user_data["state"] = "add_keys"
-            await update.message.reply_text("Enter keys (separated by newline):", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
+            context.user_data.update({"add_game": text, "state": "select_plan"})
+            await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup([[p] for p in GAME_PLANS[text].keys()] + [["🔙 Back"]], resize_keyboard=True))
+        elif state == "select_plan":
+            context.user_data.update({"add_plan": text, "state": "add_keys"})
+            await update.message.reply_text("Enter keys (one per line):")
         elif state == "add_keys":
-            keys = text.split("\n")
-            for k in keys: save_key(context.user_data["add_game"], k.strip(), context.user_data["add_plan"])
-            await update.message.reply_text("✅ Keys Saved!", reply_markup=ReplyKeyboardMarkup([["🛠 Admin Panel"]], resize_keyboard=True))
+            for k in text.split("\n"): save_key(context.user_data["add_game"], k.strip(), context.user_data["add_plan"])
+            await update.message.reply_text("✅ Saved!")
             context.user_data.clear()
-        elif text == "🔙 Back":
-            context.user_data.clear()
-            await start(update, context)
+        elif text == "🔙 Back": context.user_data.clear(); await start(update, context)
 
-    # यूजर फ्लो
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
     elif update.message.photo and user_id != ADMIN_ID:
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
-            caption=f"Payment from {user_id}", 
+        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}", 
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}")]]))
         await update.message.reply_text("✅ Screenshot sent!")
 
 async def button_click(update, context):
     query = update.callback_query
+    await query.answer() # फास्ट रिस्पॉन्स के लिए
     if query.data.startswith("game_"):
         game = query.data.split("_")[1]
         kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{game}_{p}")] for p, pr in GAME_PLANS[game].items()]
         await query.message.reply_text("Select Plan:", reply_markup=InlineKeyboardMarkup(kb))
     elif query.data.startswith("acc_"):
-        # यहाँ अपना पुराना एक्सेप्ट लॉजिक रखें
-        await query.edit_message_caption("✅ Approved and Key delivered.")
+        uid = query.data.split("_")[1]
+        key = approve_and_assign_key(int(uid), "KING", "1 Day") # यहाँ गेम/प्लान लॉजिक डायनामिक रखें
+        await query.edit_message_caption(f"✅ Approved. Key: {key}" if key else "⚠️ No keys!")
 
 def main():
     create_tables()
