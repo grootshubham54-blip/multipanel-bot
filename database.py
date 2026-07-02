@@ -14,12 +14,13 @@ def create_tables():
     )
     """)
     
-    # Keys Table (Updated with game_name)
+    # Keys Table (Updated with plan column)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS keys (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         game_name TEXT,
         key_code TEXT,
+        plan TEXT,
         is_used INTEGER DEFAULT 0
     )
     """)
@@ -35,6 +36,13 @@ def create_tables():
     )
     """)
     
+    # Automatically add 'plan' column if the database already exists on Railway
+    try:
+        cursor.execute("ALTER TABLE keys ADD COLUMN plan TEXT")
+    except sqlite3.OperationalError:
+        # Column already exists, do nothing
+        pass
+    
     conn.commit()
     conn.close()
 
@@ -45,10 +53,11 @@ def add_user(user_id, username):
     conn.commit()
     conn.close()
 
-def save_key(game_name, key_code):
+# Updated to take 3 parameters (game_name, key_code, plan)
+def save_key(game_name, key_code, plan):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO keys (game_name, key_code) VALUES (?, ?)", (game_name, key_code))
+    cursor.execute("INSERT INTO keys (game_name, key_code, plan) VALUES (?, ?, ?)", (game_name, key_code, plan))
     conn.commit()
     conn.close()
 
