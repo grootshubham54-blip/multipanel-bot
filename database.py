@@ -8,21 +8,13 @@ def create_tables():
     cur = conn.cursor()
     cur.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, username TEXT)")
     cur.execute("CREATE TABLE IF NOT EXISTS keys (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT, plan TEXT, key TEXT, used INTEGER DEFAULT 0, user_id INTEGER)")
-    cur.execute("CREATE TABLE IF NOT EXISTS pending_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, game TEXT, plan TEXT, photo_file_id TEXT)")
-    conn.commit()
-    conn.close()
-
-def add_user(user_id, username):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
     conn.commit()
     conn.close()
 
 def save_key(game, key, plan):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("INSERT INTO keys (game, plan, key) VALUES (?, ?, ?)", (game, plan, key))
+    cur.execute("INSERT INTO keys (game, plan, key) VALUES (?, ?, ?)", (game.strip(), plan.strip(), key.strip()))
     conn.commit()
     conn.close()
 
@@ -37,7 +29,7 @@ def get_user_keys(user_id):
 def get_stock_count(game, plan):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM keys WHERE game=? AND plan=? AND used=0", (game, plan))
+    cur.execute("SELECT COUNT(*) FROM keys WHERE game=? AND plan=? AND used=0", (game.strip(), plan.strip()))
     count = cur.fetchone()[0]
     conn.close()
     return count
@@ -50,7 +42,6 @@ def get_total_users():
     conn.close()
     return count
 
-# यह नया फंक्शन जोड़ेगा
 def get_all_keys_report():
     conn = get_conn()
     cur = conn.cursor()
@@ -62,7 +53,8 @@ def get_all_keys_report():
 def approve_and_assign_key(user_id, game, plan):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game, plan))
+    # Strip का उपयोग किया गया है ताकि डेटा मैचिंग में गड़बड़ न हो
+    cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game.strip(), plan.strip()))
     row = cur.fetchone()
     if row:
         kid, key = row
