@@ -1,11 +1,13 @@
 import os
 import logging
+
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
 )
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -18,6 +20,7 @@ from telegram.ext import (
 from database import create_tables
 from admin_panel import admin_game_selection_keyboard
 
+# Logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
@@ -25,12 +28,14 @@ logging.basicConfig(
 
 TOKEN = os.getenv("BOT_TOKEN")
 
+# Games & Plans
 GAME_PLANS = {
     "👑 KING iOS": {
         "1 Day": "200",
         "1 Week": "800",
         "1 Month": "2000"
     },
+
     "WINIOS": {
         "1 Day": "199",
         "1 Week": "600",
@@ -58,6 +63,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == "🎮 Games":
+
         await update.message.reply_text(
             "गेम चुनें:",
             reply_markup=admin_game_selection_keyboard()
@@ -76,7 +82,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
 
         await update.message.reply_text(
-            f"{text} का प्लान चुनें:",
+            f"🎮 {text} का प्लान चुनें:",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
@@ -92,12 +98,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if query.data.startswith("qr_"):
 
-            qr_url = "https://telegra.ph/file/0c32608447814c81a54a0.jpg"
-
-            await query.message.reply_photo(
-                photo=qr_url,
-                caption="✅ पेमेंट करके स्क्रीनशॉट भेजें।"
-            )
+            with open("qr.JPG", "rb") as qr:
+                await query.message.reply_photo(
+                    photo=qr,
+                    caption="✅ यह रहा QR कोड। पेमेंट करके स्क्रीनशॉट भेजें।"
+                )
 
     except Exception as e:
         logging.error(f"QR Error: {e}")
@@ -113,13 +118,17 @@ def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             message_handler
         )
     )
-    app.add_handler(CallbackQueryHandler(button_click))
+
+    app.add_handler(
+        CallbackQueryHandler(button_click)
+    )
 
     app.run_polling()
 
