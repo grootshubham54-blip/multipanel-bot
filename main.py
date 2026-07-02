@@ -1,6 +1,6 @@
 import os
 import logging
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
 # अपनी फाइल्स से इम्पोर्ट्स
@@ -12,13 +12,13 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 
-# गेम्स और कीमतें
+# गेम और उनके प्लान्स
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
     "WINIOS": {"1 Day": "199", "1 Week": "600", "1 Month": "1299"},
     "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
-    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "120", "1 Week": "499", "1 Month": "999"},
-    "𝘿𝙀𝘼𝘿𝙀𝙔𝙀": {"1 Day": "150", "1 Week": "650", "1 Month": "1599"}
+    "Mars Loader": {"1 Day": "120", "1 Week": "499", "1 Month": "999"},
+    "DEADEYE": {"1 Day": "150", "1 Week": "650", "1 Month": "1599"}
 }
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -33,43 +33,29 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await query.answer() # यह Loading... हटाने के लिए जरूरी है
     
     if query.data.startswith("buy_"):
-        _, game, plan = query.data.split("_")
-        price = GAME_PLANS[game][plan]
+        # QR कोड: यहाँ आपको अपने फोटो की File ID डालनी है
+        # फाइल ID पाने के लिए: फोटो को बॉट को भेजें और बॉट से उसकी ID कॉपी करें
+        qr_file_id = "AgACAgQAAxkBAA..." # अपनी वाली File ID यहाँ डालें
         
-        # यह वह QR इमेज है जो आपने दिखाई थी (File ID का उपयोग करें जो आपने टेलीग्राम से ली है)
-        qr_file_id = "AgACAgQAAxkBAA..." # यहाँ अपनी सही File ID डालें
-        
-        payment_text = (
-            f"💳 *Payment Details*\n\n"
-            f"👑 Plan: {game} {plan}\n"
-            f"💰 Amount: ₹{price}\n\n"
-            f"1. Scan the QR Code above to pay.\n"
-            f"2. Next Step: Send the payment success screenshot here.\n\n"
-            f"💡 Note: Click below to cancel."
+        await query.message.reply_photo(
+            photo=qr_file_id, 
+            caption="✅ कृपया इस QR पर पेमेंट करें और स्क्रीनशॉट भेजें।"
         )
-        
-        keyboard = [[InlineKeyboardButton("❌ Cancel Payment", callback_data="cancel_pay")]]
-        
-        await query.message.reply_photo(photo=qr_file_id, caption=payment_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif query.data == "cancel_pay":
-        await query.message.edit_caption(caption="❌ Payment cancelled.")
-
     elif query.data.startswith("accept_") or query.data.startswith("reject_"):
         user_id = query.data.split("_")[1]
         status = "एक्सेप्ट" if "accept" in query.data else "रिजेक्ट"
-        await context.bot.send_message(user_id, f"✅ आपकी पेमेंट {status} हो गई है।")
-        await query.edit_message_caption(caption=f"✅ पेमेंट {status} कर दी गई।")
+        await context.bot.send_message(user_id, f"✅ आपकी पेमेंट {status} कर दी गई है।")
+        await query.edit_message_caption(caption=f"✅ {status} कर दिया गया।")
 
 async def handle_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo:
         user = update.effective_user
         keyboard = [[InlineKeyboardButton("✅ Accept", callback_data=f"accept_{user.id}"), InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}")]]
-        await context.bot.send_photo(ADMIN_ID, photo=update.message.photo[-1].file_id, caption=f"👤 User: @{user.username}\nपेमेंट कन्फर्म करें:", reply_markup=InlineKeyboardMarkup(keyboard))
-        await update.message.reply_text("✅ Screenshot received! Request sent to admin.")
+        await context.bot.send_photo(ADMIN_ID, photo=update.message.photo[-1].file_id, caption=f"👤 User: @{user.username}\nपेमेंट चेक करें:", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text("✅ स्क्रीनशॉट एडमिन को भेज दिया गया है।")
 
 def main():
     app = Application.builder().token(TOKEN).build()
