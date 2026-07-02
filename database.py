@@ -19,7 +19,7 @@ def add_user(user_id, username):
     conn.commit()
     conn.close()
 
-def save_key(game, plan, key):
+def save_key(game, key, plan):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("INSERT INTO keys (game, plan, key) VALUES (?, ?, ?)", (game, plan, key))
@@ -34,9 +34,13 @@ def get_user_keys(user_id):
     conn.close()
     return keys
 
-# फिक्स: जो फंक्शन्स missing थे
-def get_stock_count():
-    return 0 
+def get_stock_count(game, plan):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM keys WHERE game=? AND plan=? AND used=0", (game, plan))
+    count = cur.fetchone()[0]
+    conn.close()
+    return count
 
 def get_total_users():
     conn = get_conn()
@@ -46,6 +50,17 @@ def get_total_users():
     conn.close()
     return count
 
-def approve_and_assign_key(pending_id):
-    # यह आपका मौजूदा अप्रूवल लॉजिक होगा
-    return None, None
+def approve_and_assign_key(user_id, game, plan):
+    conn = get_conn()
+    cur = conn.cursor()
+    # उपलब्ध की (key) खोजें
+    cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game, plan))
+    row = cur.fetchone()
+    if row:
+        kid, key = row
+        cur.execute("UPDATE keys SET used=1, user_id=? WHERE id=?", (user_id, kid))
+        conn.commit()
+        conn.close()
+        return key
+    conn.close()
+    return None
