@@ -1,10 +1,11 @@
 import sqlite3
+import os
 
-# इसे 'bot_database.db' करें ताकि यह डेटाबेस वाली फाइल के साथ सिंक रहे
-DB_NAME = "bot_database.db" 
+# Railway पर पाथ सिंक करने के लिए वही पाथ इस्तेमाल करें जो database.py में है
+DB_PATH = os.path.join(os.getcwd(), "bot_database.db")
 
 def save_payment(user_id, plan, amount):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute(
