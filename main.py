@@ -38,11 +38,18 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
+    # --- SECURITY LAYER: अनधिकृत कमांड्स को ब्लॉक करना ---
+    admin_commands = ["🛠 Admin Panel", "📢 Broadcast", "🗑 Delete Key", "👥 Total Users", "📜 Key Report", "📊 Stock", "🔑 Add Keys", "📊 Sales Dashboard"]
+    if text in admin_commands and user_id != ADMIN_ID:
+        await update.message.reply_text("⛔️ Access Denied!")
+        return
+
+    # एडमिन लॉजिक
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
             context.user_data["state"] = "broadcast_msg"
-            await update.message.reply_text("Enter the message (text) for broadcast:", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
+            await update.message.reply_text("Enter message:", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
             return
         elif context.user_data.get("state") == "broadcast_msg":
             if text == "🔙 Back": context.user_data.clear(); await start(update, context); return
@@ -58,8 +65,9 @@ async def message_handler(update, context):
             for uid in users:
                 try: await context.bot.send_photo(uid, photo=photo_id, caption=text_msg); count += 1
                 except: pass
-            await update.message.reply_text(f"✅ Photo Broadcast sent to {count} users!", reply_markup=admin_keyboard())
+            await update.message.reply_text(f"✅ Broadcast sent to {count} users!", reply_markup=admin_keyboard())
             context.user_data.clear(); return
+        
         elif text == "🗑 Delete Key":
             context.user_data["state"] = "delete_key_id"
             await update.message.reply_text("Enter the ID of the key to delete:")
@@ -67,22 +75,22 @@ async def message_handler(update, context):
         elif context.user_data.get("state") == "delete_key_id":
             try:
                 delete_key_by_id(int(text))
-                await update.message.reply_text("✅ Key deleted successfully!", reply_markup=admin_keyboard())
+                await update.message.reply_text("✅ Key deleted!", reply_markup=admin_keyboard())
             except: await update.message.reply_text("⚠️ Invalid ID!", reply_markup=admin_keyboard())
             context.user_data.clear(); return
+            
         elif text == "📊 Sales Dashboard":
-            total_users = get_total_users()
-            available = get_total_available_keys()
             sold = get_sold_keys_count()
-            dashboard = (f"📊 *Sales Dashboard*\n\n👥 Users: {total_users}\n🔑 Available Keys: {available}\n"
-                         f"✅ Sold Keys: {sold}\n💰 Total Revenue (Est): ₹{sold * 200}")
+            dashboard = (f"📊 *Sales Dashboard*\n\n👥 Users: {get_total_users()}\n🔑 Available: {get_total_available_keys()}\n"
+                         f"✅ Sold: {sold}\n💰 Revenue (Est): ₹{sold * 200}")
             await update.message.reply_text(dashboard, parse_mode="Markdown")
+            
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
         elif text == "📜 Key Report":
-            report = "📜 *Status Report:*\n\n"
+            report = "📜 *Report:*\n\n"
             for kid, g, p, k, used, uid in get_all_keys_report_with_id():
                 status = "✅ Sold" if used == 1 else "🟢 Available"
-                report += f"🆔 ID: {kid} | 🎮 {g} | {p}\n🔑 `{k}` | {status}\n\n"
+                report += f"🆔 {kid} | 🎮 {g} | {p}\n🔑 `{k}` | {status}\n\n"
             await update.message.reply_text(report, parse_mode="Markdown")
         elif text == "📊 Stock":
             msg = "📊 *Current Stock:*\n\n"
@@ -107,10 +115,9 @@ async def message_handler(update, context):
             await update.message.reply_text("✅ Keys Saved!", reply_markup=admin_keyboard())
             context.user_data.clear()
         elif text == "🔙 Back":
-            context.user_data.clear()
-            await start(update, context)
-            return
+            context.user_data.clear(); await start(update, context); return
 
+    # --- USER SECTION ---
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -119,9 +126,11 @@ async def message_handler(update, context):
         if not keys: await update.message.reply_text("No keys found!")
         else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
     elif text == "📞 Support":
-        await update.message.reply_text(f"📞 Contact Support: {SUPPORT_USERNAME}")
+        await update.message.reply_text(f"📞 Contact: {SUPPORT_USERNAME}")
     elif text == "💳 Payment":
         await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
+    
+    # --- SECURITY LAYER: सिर्फ पेमेंट स्क्रीनशॉट ही प्रोसेस करें ---
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A")
         p = context.user_data.get("plan", "N/A")
@@ -136,10 +145,6 @@ async def button_click(update, context):
     if query.data.startswith("game_"):
         game = query.data.split("_")[1]
         context.user_data["game"] = game
-        alert_msg = ""
-        for plan in GAME_PLANS[game].keys():
-            if get_stock_count(game, plan) <= 2: alert_msg += f"⚠️ *Low Stock:* {game} ({plan}) - {get_stock_count(game, plan)} left\n"
-        if alert_msg: await context.bot.send_message(ADMIN_ID, alert_msg, parse_mode="Markdown")
         kb = [[InlineKeyboardButton(f"{p} - ₹{pr} ({get_stock_count(game, p)} Left)", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
         await query.message.reply_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
     elif query.data.startswith("pay_"):
@@ -147,7 +152,7 @@ async def button_click(update, context):
         plan, price, game = data[1], data[2], context.user_data.get("game")
         context.user_data["plan"] = plan
         try:
-            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send the screenshot here.", parse_mode="Markdown")
+            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send screenshot.", parse_mode="Markdown")
         except: await query.message.reply_text("⚠️ QR file not found!")
     elif query.data.startswith("acc_"):
         data = query.data.split("_")
