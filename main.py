@@ -8,6 +8,10 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
 
+# अपना Username और UPI ID यहाँ लिखें
+SUPPORT_USERNAME = "@YourUsername" 
+PAYMENT_DETAILS = "UPI ID: yourname@upi"
+
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
     "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
@@ -30,6 +34,7 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
+    # एडमिन फ्लो
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
@@ -66,6 +71,7 @@ async def message_handler(update, context):
             await start(update, context)
             return
 
+    # यूजर बटन लॉजिक
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -73,10 +79,13 @@ async def message_handler(update, context):
         keys = get_user_keys(user_id)
         if not keys: await update.message.reply_text("No keys found!")
         else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
+    elif text == "📞 Support":
+        await update.message.reply_text(f"📞 Contact Support: {SUPPORT_USERNAME}")
+    elif text == "💳 Payment":
+        await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A")
         p = context.user_data.get("plan", "N/A")
-        # यहाँ बटन में गेम और प्लान का नाम भेज रहे हैं
         await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
                                      caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", 
                                      reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}")]]))
@@ -95,7 +104,9 @@ async def button_click(update, context):
         plan, price, game = data[1], data[2], context.user_data.get("game")
         context.user_data["plan"] = plan
         invoice_msg = f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 *Pay to this QR and send the screenshot here.*"
-        with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=invoice_msg, parse_mode="Markdown")
+        try:
+            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=invoice_msg, parse_mode="Markdown")
+        except: await query.message.reply_text("⚠️ QR file not found!")
     elif query.data.startswith("acc_"):
         data = query.data.split("_")
         uid, game, plan = int(data[1]), data[2], data[3]
