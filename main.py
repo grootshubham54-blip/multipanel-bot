@@ -2,7 +2,7 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import create_tables, save_key, approve_and_assign_key, get_user_keys, get_stock_count, get_total_users, get_all_keys_report, get_all_user_ids
+from database import create_tables, save_key, approve_and_assign_key, get_user_keys, get_stock_count, get_total_users, get_all_keys_report_with_id, get_all_user_ids, delete_key_by_id
 
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
@@ -21,7 +21,7 @@ GAME_PLANS = {
 }
 
 def admin_keyboard():
-    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📜 Key Report", "👥 Total Users"], ["📢 Broadcast", "🔙 Back"]], resize_keyboard=True)
+    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📜 Key Report", "👥 Total Users"], ["📢 Broadcast", "🗑 Delete Key"], ["🔙 Back"]], resize_keyboard=True)
 
 async def start(update, context):
     user_id = update.effective_user.id
@@ -40,24 +40,30 @@ async def message_handler(update, context):
             await update.message.reply_text("Please enter the message:", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
             return
         elif context.user_data.get("state") == "broadcast_msg":
-            if text == "🔙 Back":
-                context.user_data.clear()
-                await start(update, context)
-                return
+            if text == "🔙 Back": context.user_data.clear(); await start(update, context); return
             users = get_all_user_ids()
             count = 0
             for uid in users:
                 try: await context.bot.send_message(uid, text); count += 1
                 except: pass
             await update.message.reply_text(f"✅ Sent to {count} users!", reply_markup=admin_keyboard())
-            context.user_data.clear()
+            context.user_data.clear(); return
+        elif text == "🗑 Delete Key":
+            context.user_data["state"] = "delete_key_id"
+            await update.message.reply_text("Please enter the ID of the key to delete (check Key Report for ID):")
             return
+        elif context.user_data.get("state") == "delete_key_id":
+            try:
+                delete_key_by_id(int(text))
+                await update.message.reply_text("✅ Key deleted successfully!", reply_markup=admin_keyboard())
+            except: await update.message.reply_text("⚠️ Invalid ID!", reply_markup=admin_keyboard())
+            context.user_data.clear(); return
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
         elif text == "📜 Key Report":
             report = "📜 *Status Report:*\n\n"
-            for g, p, k, used, uid in get_all_keys_report():
+            for kid, g, p, k, used, uid in get_all_keys_report_with_id():
                 status = "✅ Sold" if used == 1 else "🟢 Available"
-                report += f"🎮 {g} | {p}\n🔑 `{k}` | {status}\n\n"
+                report += f"🆔 ID: {kid} | 🎮 {g} | {p}\n🔑 `{k}` | {status}\n\n"
             await update.message.reply_text(report, parse_mode="Markdown")
         elif text == "📊 Stock":
             msg = "📊 *Current Stock:*\n\n"
@@ -111,21 +117,15 @@ async def button_click(update, context):
     if query.data.startswith("game_"):
         game = query.data.split("_")[1]
         context.user_data["game"] = game
-        
-        # Low Stock Alert for Admin
         alert_msg = ""
         for plan in GAME_PLANS[game].keys():
-            if get_stock_count(game, plan) <= 2:
-                alert_msg += f"⚠️ *Low Stock:* {game} ({plan}) - {get_stock_count(game, plan)} left\n"
+            if get_stock_count(game, plan) <= 2: alert_msg += f"⚠️ *Low Stock:* {game} ({plan}) - {get_stock_count(game, plan)} left\n"
         if alert_msg: await context.bot.send_message(ADMIN_ID, alert_msg, parse_mode="Markdown")
-
-        # Customer View: Plan + Stock count
         kb = []
         for p, pr in GAME_PLANS[game].items():
             stock = get_stock_count(game, p)
             kb.append([InlineKeyboardButton(f"{p} - ₹{pr} ({stock} Left)", callback_data=f"pay_{p}_{pr}")])
         await query.message.reply_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
-        
     elif query.data.startswith("pay_"):
         data = query.data.split("_")
         plan, price, game = data[1], data[2], context.user_data.get("game")
