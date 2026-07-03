@@ -14,22 +14,33 @@ def create_tables():
     conn.commit()
     conn.close()
 
-# बैकअप फीचर
-def create_backup():
-    if not os.path.exists("backups"):
-        os.makedirs("backups")
-    dest = f"backups/backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.db"
-    shutil.copy2("bot_database.db", dest)
-    return dest
+# --- नया: Export फीचर्स ---
+def get_all_keys_export():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id, game, plan, key, used, user_id FROM keys")
+    data = cur.fetchall()
+    conn.close()
+    return data
 
-def get_all_user_ids():
+def get_all_users_export():
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM users")
-    ids = [row[0] for row in cur.fetchall()]
+    data = cur.fetchall()
     conn.close()
-    return ids
+    return data
 
+# --- नया: Resend Key (यूजर आईडी से पुरानी की ढूंढना) ---
+def get_key_by_user_id(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=? AND used=1", (user_id,))
+    data = cur.fetchall()
+    conn.close()
+    return data
+
+# (बाकी पुराने फंक्शन्स वही रहेंगे - delete_key_by_id, save_key, आदि)
 def delete_key_by_id(key_id):
     conn = get_conn()
     cur = conn.cursor()
@@ -91,6 +102,12 @@ def get_total_available_keys():
     count = cur.fetchone()[0]
     conn.close()
     return count
+
+def create_backup():
+    if not os.path.exists("backups"): os.makedirs("backups")
+    dest = f"backups/backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.db"
+    shutil.copy2("bot_database.db", dest)
+    return dest
 
 def approve_and_assign_key(user_id, game, plan):
     conn = get_conn()
