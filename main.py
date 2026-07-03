@@ -2,12 +2,13 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import create_tables, save_key, approve_and_assign_key, get_user_keys, get_stock_count, get_total_users, get_all_keys_report, get_all_user_ids # ध्यान दें: database.py में get_all_user_ids फंक्शन होना चाहिए
+from database import create_tables, save_key, approve_and_assign_key, get_user_keys, get_stock_count, get_total_users, get_all_keys_report
 
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
 
+# आपका यूजरनेम यहाँ अपडेटेड है
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
@@ -21,7 +22,7 @@ GAME_PLANS = {
 }
 
 def admin_keyboard():
-    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📜 Key Report", "👥 Total Users"], ["📢 Broadcast", "🔙 Back"]], resize_keyboard=True)
+    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📜 Key Report", "👥 Total Users"], ["🔙 Back"]], resize_keyboard=True)
 
 async def start(update, context):
     user_id = update.effective_user.id
@@ -35,27 +36,6 @@ async def message_handler(update, context):
     
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
-        elif text == "📢 Broadcast":
-            context.user_data["state"] = "broadcast_msg"
-            await update.message.reply_text("Please enter the message you want to broadcast:", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
-            return
-        elif context.user_data.get("state") == "broadcast_msg":
-            if text == "🔙 Back":
-                context.user_data.clear()
-                await start(update, context)
-                return
-            # Broadcast Logic
-            users = get_all_user_ids()
-            count = 0
-            for uid in users:
-                try:
-                    await context.bot.send_message(uid, text)
-                    count += 1
-                except: pass
-            await update.message.reply_text(f"✅ Broadcast sent to {count} users!", reply_markup=admin_keyboard())
-            context.user_data.clear()
-            return
-        
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
         elif text == "📜 Key Report":
             report = "📜 *Status Report:*\n\n"
@@ -90,7 +70,6 @@ async def message_handler(update, context):
             await start(update, context)
             return
 
-    # User Logic
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -110,4 +89,39 @@ async def message_handler(update, context):
                                      reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}")]]))
         await update.message.reply_text("✅ Screenshot sent!")
 
-# ... (बाकी button_click और main फंक्शन वही रहेंगे)
+async def button_click(update, context):
+    query = update.callback_query
+    await query.answer()
+    if query.data.startswith("game_"):
+        game = query.data.split("_")[1]
+        context.user_data["game"] = game
+        kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
+        await query.message.reply_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+    elif query.data.startswith("pay_"):
+        data = query.data.split("_")
+        plan, price, game = data[1], data[2], context.user_data.get("game")
+        context.user_data["plan"] = plan
+        invoice_msg = f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 *Pay to this QR and send the screenshot here.*"
+        try:
+            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=invoice_msg, parse_mode="Markdown")
+        except: await query.message.reply_text("⚠️ QR file not found!")
+    elif query.data.startswith("acc_"):
+        data = query.data.split("_")
+        uid, game, plan = int(data[1]), data[2], data[3]
+        key = approve_and_assign_key(uid, game, plan)
+        if key:
+            await context.bot.send_message(uid, f"✅ *Payment Approved!*\n\n🎮 {game}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
+            await query.edit_message_caption(caption=f"✅ Approved! Key: {key}")
+        else: await query.edit_message_caption(caption="⚠️ Error: No keys available for this selection!")
+
+def main():
+    create_tables()
+    app = Application.builder().token(TOKEN).concurrent_updates(True).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
+    app.add_handler(CallbackQueryHandler(button_click))
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
+ इसमें कोई बग या फिर कोई इशू तो नहीं है ना? करके बताओ। बाकी फीचर्स रिमूव करना जैसा है ना। अगर कुछ
