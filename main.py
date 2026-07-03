@@ -35,22 +35,33 @@ async def message_handler(update, context):
     
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        
+        # --- ब्रॉडकास्ट लॉजिक ---
         elif text == "📢 Broadcast":
             context.user_data["state"] = "broadcast_msg"
-            await update.message.reply_text("Please enter the message:", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
+            await update.message.reply_text("Please enter the message (text) for broadcast:", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
             return
         elif context.user_data.get("state") == "broadcast_msg":
             if text == "🔙 Back": context.user_data.clear(); await start(update, context); return
+            context.user_data["broadcast_text"] = text
+            context.user_data["state"] = "broadcast_photo"
+            await update.message.reply_text("Now send the photo for broadcast:")
+            return
+        elif context.user_data.get("state") == "broadcast_photo" and update.message.photo:
+            photo_id = update.message.photo[-1].file_id
+            text_msg = context.user_data.get("broadcast_text", "")
             users = get_all_user_ids()
             count = 0
             for uid in users:
-                try: await context.bot.send_message(uid, text); count += 1
+                try: await context.bot.send_photo(uid, photo=photo_id, caption=text_msg); count += 1
                 except: pass
-            await update.message.reply_text(f"✅ Sent to {count} users!", reply_markup=admin_keyboard())
+            await update.message.reply_text(f"✅ Photo Broadcast sent to {count} users!", reply_markup=admin_keyboard())
             context.user_data.clear(); return
+
+        # --- डिलीट की लॉजिक ---
         elif text == "🗑 Delete Key":
             context.user_data["state"] = "delete_key_id"
-            await update.message.reply_text("Please enter the ID of the key to delete (check Key Report for ID):")
+            await update.message.reply_text("Enter the ID of the key to delete (check Key Report for ID):")
             return
         elif context.user_data.get("state") == "delete_key_id":
             try:
@@ -58,6 +69,7 @@ async def message_handler(update, context):
                 await update.message.reply_text("✅ Key deleted successfully!", reply_markup=admin_keyboard())
             except: await update.message.reply_text("⚠️ Invalid ID!", reply_markup=admin_keyboard())
             context.user_data.clear(); return
+
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
         elif text == "📜 Key Report":
             report = "📜 *Status Report:*\n\n"
