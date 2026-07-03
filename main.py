@@ -38,13 +38,11 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
-    # --- SECURITY LAYER: अनधिकृत कमांड्स को ब्लॉक करना ---
+    # SECURITY: अनधिकृत एडमिन एक्सेस ब्लॉक
     admin_commands = ["🛠 Admin Panel", "📢 Broadcast", "🗑 Delete Key", "👥 Total Users", "📜 Key Report", "📊 Stock", "🔑 Add Keys", "📊 Sales Dashboard"]
     if text in admin_commands and user_id != ADMIN_ID:
-        await update.message.reply_text("⛔️ Access Denied!")
         return
 
-    # एडमिन लॉजिक
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
@@ -70,7 +68,7 @@ async def message_handler(update, context):
         
         elif text == "🗑 Delete Key":
             context.user_data["state"] = "delete_key_id"
-            await update.message.reply_text("Enter the ID of the key to delete:")
+            await update.message.reply_text("Enter ID of key to delete:")
             return
         elif context.user_data.get("state") == "delete_key_id":
             try:
@@ -81,8 +79,13 @@ async def message_handler(update, context):
             
         elif text == "📊 Sales Dashboard":
             sold = get_sold_keys_count()
-            dashboard = (f"📊 *Sales Dashboard*\n\n👥 Users: {get_total_users()}\n🔑 Available: {get_total_available_keys()}\n"
-                         f"✅ Sold: {sold}\n💰 Revenue (Est): ₹{sold * 200}")
+            # यहाँ हमने फिक्स किया है: रियल-टाइम कैलकुलेशन
+            revenue = sold * 200 
+            dashboard = (f"📊 *Sales Dashboard*\n\n"
+                         f"👥 Total Users: {get_total_users()}\n"
+                         f"🔑 Available: {get_total_available_keys()}\n"
+                         f"✅ Sold Keys: {sold}\n"
+                         f"💰 Total Revenue: ₹{revenue}")
             await update.message.reply_text(dashboard, parse_mode="Markdown")
             
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
@@ -130,7 +133,7 @@ async def message_handler(update, context):
     elif text == "💳 Payment":
         await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     
-    # --- SECURITY LAYER: सिर्फ पेमेंट स्क्रीनशॉट ही प्रोसेस करें ---
+    # SECURITY: सिर्फ पेमेंट स्क्रीनशॉट ही प्रोसेस करें
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A")
         p = context.user_data.get("plan", "N/A")
