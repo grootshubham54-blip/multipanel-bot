@@ -14,7 +14,6 @@ def create_tables():
     conn.commit()
     conn.close()
 
-# --- नया: Export फीचर्स ---
 def get_all_keys_export():
     conn = get_conn()
     cur = conn.cursor()
@@ -23,15 +22,6 @@ def get_all_keys_export():
     conn.close()
     return data
 
-def get_all_users_export():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT user_id FROM users")
-    data = cur.fetchall()
-    conn.close()
-    return data
-
-# --- नया: Resend Key (यूजर आईडी से पुरानी की ढूंढना) ---
 def get_key_by_user_id(user_id):
     conn = get_conn()
     cur = conn.cursor()
@@ -40,7 +30,6 @@ def get_key_by_user_id(user_id):
     conn.close()
     return data
 
-# (बाकी पुराने फंक्शन्स वही रहेंगे - delete_key_by_id, save_key, आदि)
 def delete_key_by_id(key_id):
     conn = get_conn()
     cur = conn.cursor()
