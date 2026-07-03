@@ -42,7 +42,6 @@ async def message_handler(update, context):
         await start(update, context)
         return
 
-    # एडमिन कमांड्स की चेकिंग
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "🔑 Add Keys":
@@ -64,7 +63,12 @@ async def message_handler(update, context):
                 if k.strip(): save_key(context.user_data["add_game"], k.strip(), context.user_data["add_plan"])
             await update.message.reply_text("✅ Keys Saved!", reply_markup=admin_keyboard())
             context.user_data.clear()
-        # बाकी एडमिन फीचर्स...
+        elif text == "📊 Stock":
+            msg = "📊 *Current Stock:*\n\n"
+            for g, plans in GAME_PLANS.items():
+                msg += f"*{g}:*\n"
+                for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
+            await update.message.reply_text(msg, parse_mode="Markdown")
         elif text == "💾 Backup DB":
             path = create_backup()
             await update.message.reply_text(f"✅ Backup saved at: {path}")
@@ -74,12 +78,6 @@ async def message_handler(update, context):
                 f.write("ID,Game,Plan,Key,Used,UserID\n")
                 for r in data: f.write(f"{','.join(map(str, r))}\n")
             await update.message.reply_document(document=open("keys.csv", "rb"))
-        elif text == "📊 Stock":
-            msg = "📊 *Current Stock:*\n\n"
-            for g, plans in GAME_PLANS.items():
-                msg += f"*{g}:*\n"
-                for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
-            await update.message.reply_text(msg, parse_mode="Markdown")
         elif text == "🔄 Resend Key":
             context.user_data["state"] = "resend_uid"
             await update.message.reply_text("Enter Customer User ID:")
@@ -105,7 +103,6 @@ async def message_handler(update, context):
             sold = get_sold_keys_count()
             await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
 
-    # User Section
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -124,7 +121,6 @@ async def button_click(update, context):
     query = update.callback_query; await query.answer()
     if query.data.startswith("game_"):
         game = query.data.split("_")[1]; context.user_data["game"] = game
-        # प्लान के बटन्स के साथ Back बटन (callback_data: back_games)
         kb = [[InlineKeyboardButton(f"{p} - ₹{pr} ({get_stock_count(game, p)} Left)", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
         kb.append([InlineKeyboardButton("🔙 Back", callback_data="back_games")])
         await query.edit_message_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
@@ -140,8 +136,9 @@ async def button_click(update, context):
         data = query.data.split("_"); uid, game, plan = int(data[1]), data[2], data[3]
         key = approve_and_assign_key(uid, game, plan)
         if key:
-            await context.bot.send_message(uid, f"✅ *Payment Approved!*\n\n🎮 {game}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
-            await query.edit_message_caption(caption=f"✅ Approved! Key: {key}")
+            success_msg = (f"🎉 *Payment Received Successfully!*\n\n━━━━━━━━━━━━━━━━━━\n📦 *Purchase Details:*\n🎮 *Game:* {game}\n⏳ *Plan:* {plan}\n━━━━━━━━━━━━━━━━━━\n\n🔑 *Your Access Key:*\n`{key}`\n\n━━━━━━━━━━━━━━━━━━\n🙏 *Thank you for your purchase!*\n🚀 Enjoy your access!")
+            await context.bot.send_message(uid, success_msg, parse_mode="Markdown")
+            await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
         else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
 
 def main():
