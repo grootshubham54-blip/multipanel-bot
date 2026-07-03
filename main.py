@@ -2,13 +2,12 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import create_tables, save_key, approve_and_assign_key, get_user_keys, get_stock_count, get_total_users, get_all_keys_report
+from database import create_tables, save_key, approve_and_assign_key, get_user_keys, get_stock_count, get_total_users, get_all_keys_report, get_all_user_ids
 
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
 
-# आपका यूजरनेम यहाँ अपडेटेड है
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
@@ -22,7 +21,7 @@ GAME_PLANS = {
 }
 
 def admin_keyboard():
-    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📜 Key Report", "👥 Total Users"], ["🔙 Back"]], resize_keyboard=True)
+    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📜 Key Report", "👥 Total Users"], ["📢 Broadcast", "🔙 Back"]], resize_keyboard=True)
 
 async def start(update, context):
     user_id = update.effective_user.id
@@ -36,6 +35,25 @@ async def message_handler(update, context):
     
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        elif text == "📢 Broadcast":
+            context.user_data["state"] = "broadcast_msg"
+            await update.message.reply_text("Please enter the message you want to broadcast:", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
+            return
+        elif context.user_data.get("state") == "broadcast_msg":
+            if text == "🔙 Back":
+                context.user_data.clear()
+                await start(update, context)
+                return
+            users = get_all_user_ids()
+            count = 0
+            for uid in users:
+                try:
+                    await context.bot.send_message(uid, text)
+                    count += 1
+                except: pass
+            await update.message.reply_text(f"✅ Broadcast sent to {count} users!", reply_markup=admin_keyboard())
+            context.user_data.clear()
+            return
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
         elif text == "📜 Key Report":
             report = "📜 *Status Report:*\n\n"
@@ -124,4 +142,3 @@ def main():
 
 if __name__ == "__main__":
     main()
- इसमें कोई बग या फिर कोई इशू तो नहीं है ना? करके बताओ। बाकी फीचर्स रिमूव करना जैसा है ना। अगर कुछ
