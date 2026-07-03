@@ -11,7 +11,7 @@ def create_tables():
     conn.commit()
     conn.close()
 
-# ब्रॉडकास्ट फीचर के लिए नया फंक्शन
+# ब्रॉडकास्ट फीचर
 def get_all_user_ids():
     conn = get_conn()
     cur = conn.cursor()
@@ -19,6 +19,23 @@ def get_all_user_ids():
     ids = [row[0] for row in cur.fetchall()]
     conn.close()
     return ids
+
+# Delete Key फीचर - यह फंक्शन जोड़ना जरूरी है
+def delete_key_by_id(key_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM keys WHERE id=?", (key_id,))
+    conn.commit()
+    conn.close()
+
+# Key Report with ID - यह फंक्शन भी जरूरी है
+def get_all_keys_report_with_id():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id, game, plan, key, used, user_id FROM keys")
+    keys = cur.fetchall()
+    conn.close()
+    return keys
 
 def save_key(game, key, plan):
     conn = get_conn()
@@ -50,14 +67,6 @@ def get_total_users():
     count = cur.fetchone()[0]
     conn.close()
     return count
-
-def get_all_keys_report():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT game, plan, key, used, user_id FROM keys")
-    keys = cur.fetchall()
-    conn.close()
-    return keys
 
 def approve_and_assign_key(user_id, game, plan):
     conn = get_conn()
