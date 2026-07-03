@@ -1,4 +1,7 @@
 import sqlite3
+import shutil
+import os
+from datetime import datetime
 
 def get_conn():
     return sqlite3.connect("bot_database.db")
@@ -10,6 +13,14 @@ def create_tables():
     cur.execute("CREATE TABLE IF NOT EXISTS keys (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT, plan TEXT, key TEXT, used INTEGER DEFAULT 0, user_id INTEGER)")
     conn.commit()
     conn.close()
+
+# बैकअप फीचर
+def create_backup():
+    if not os.path.exists("backups"):
+        os.makedirs("backups")
+    dest = f"backups/backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.db"
+    shutil.copy2("bot_database.db", dest)
+    return dest
 
 def get_all_user_ids():
     conn = get_conn()
