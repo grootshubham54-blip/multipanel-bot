@@ -99,7 +99,6 @@ async def message_handler(update, context):
             await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
         elif text == "🔙 Back": context.user_data.clear(); await start(update, context); return
 
-    # User Section
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -111,4 +110,35 @@ async def message_handler(update, context):
     elif text == "💳 Payment": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id
+        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}")]]))
+        await update.message.reply_text("✅ Screenshot sent!")
+
+async def button_click(update, context):
+    query = update.callback_query; await query.answer()
+    if query.data.startswith("game_"):
+        game = query.data.split("_")[1]; context.user_data["game"] = game
+        kb = [[InlineKeyboardButton(f"{p} - ₹{pr} ({get_stock_count(game, p)} Left)", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
+        await query.message.reply_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+    elif query.data.startswith("pay_"):
+        data = query.data.split("_"); plan, price, game = data[1], data[2], context.user_data.get("game"); context.user_data["plan"] = plan
+        try:
+            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send screenshot.", parse_mode="Markdown")
+        except: await query.message.reply_text("⚠️ QR file not found!")
+    elif query.data.startswith("acc_"):
+        data = query.data.split("_"); uid, game, plan = int(data[1]), data[2], data[3]
+        key = approve_and_assign_key(uid, game, plan)
+        if key:
+            await context.bot.send_message(uid, f"✅ *Payment Approved!*\n\n🎮 {game}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
+            await query.edit_message_caption(caption=f"✅ Approved! Key: {key}")
+        else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
+
+def main():
+    create_tables()
+    app = Application.builder().token(TOKEN).concurrent_updates(True).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
+    app.add_handler(CallbackQueryHandler(button_click))
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
