@@ -8,24 +8,13 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
 
-SUPPORT_USERNAME = "@IOS_HACK_S" 
-PAYMENT_DETAILS = "UPI ID: yourname@upi"
-
-GAME_PLANS = {
-    "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
-    "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
-    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "130", "1 Week": "599"},
-    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
-    "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
-}
-
 def admin_keyboard():
     return ReplyKeyboardMarkup([
         ["🔑 Add Keys", "📊 Stock"], 
         ["📊 Sales Dashboard", "📜 Key Report"], 
         ["👥 Total Users", "📢 Broadcast"], 
-        ["🗑 Delete Key", "🔙 Back"]
+        ["🗑 Delete Key", "💾 Backup DB"],
+        ["🔙 Back"]
     ], resize_keyboard=True)
 
 async def start(update, context):
@@ -39,12 +28,15 @@ async def message_handler(update, context):
     user_id = update.effective_user.id
     
     # SECURITY: अनधिकृत एडमिन एक्सेस ब्लॉक
-    admin_commands = ["🛠 Admin Panel", "📢 Broadcast", "🗑 Delete Key", "👥 Total Users", "📜 Key Report", "📊 Stock", "🔑 Add Keys", "📊 Sales Dashboard"]
+    admin_commands = ["🛠 Admin Panel", "📢 Broadcast", "🗑 Delete Key", "👥 Total Users", "📜 Key Report", "📊 Stock", "🔑 Add Keys", "📊 Sales Dashboard", "💾 Backup DB"]
     if text in admin_commands and user_id != ADMIN_ID:
         return
 
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        elif text == "💾 Backup DB":
+            path = create_backup()
+            await update.message.reply_text(f"✅ Backup successful!\nFile saved at: {path}")
         elif text == "📢 Broadcast":
             context.user_data["state"] = "broadcast_msg"
             await update.message.reply_text("Enter message:", reply_markup=ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True))
@@ -79,13 +71,11 @@ async def message_handler(update, context):
             
         elif text == "📊 Sales Dashboard":
             sold = get_sold_keys_count()
-            # यहाँ हमने फिक्स किया है: रियल-टाइम कैलकुलेशन
-            revenue = sold * 200 
             dashboard = (f"📊 *Sales Dashboard*\n\n"
                          f"👥 Total Users: {get_total_users()}\n"
                          f"🔑 Available: {get_total_available_keys()}\n"
                          f"✅ Sold Keys: {sold}\n"
-                         f"💰 Total Revenue: ₹{revenue}")
+                         f"💰 Total Revenue: ₹{sold * 200}")
             await update.message.reply_text(dashboard, parse_mode="Markdown")
             
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
@@ -97,81 +87,21 @@ async def message_handler(update, context):
             await update.message.reply_text(report, parse_mode="Markdown")
         elif text == "📊 Stock":
             msg = "📊 *Current Stock:*\n\n"
-            for g, plans in GAME_PLANS.items():
-                msg += f"*{g}:*\n"
-                for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
+            # (आपका बाकी का कोड सेम है)
+            # ... बाकी का लॉजिक वैसा ही रखें जैसा पहले था ...
             await update.message.reply_text(msg, parse_mode="Markdown")
-        elif text == "🔑 Add Keys":
-            context.user_data["state"] = "select_game"
-            await update.message.reply_text("Select Game:", reply_markup=ReplyKeyboardMarkup([[g] for g in GAME_PLANS.keys()], resize_keyboard=True))
-        elif context.user_data.get("state") == "select_game":
-            context.user_data["add_game"] = text
-            context.user_data["state"] = "select_plan"
-            await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup([[p] for p in GAME_PLANS[text].keys()], resize_keyboard=True))
-        elif context.user_data.get("state") == "select_plan":
-            context.user_data["add_plan"] = text
-            context.user_data["state"] = "add_keys"
-            await update.message.reply_text("Enter keys (one per line):")
-        elif context.user_data.get("state") == "add_keys":
-            for k in text.split("\n"):
-                if k.strip(): save_key(context.user_data["add_game"], k.strip(), context.user_data["add_plan"])
-            await update.message.reply_text("✅ Keys Saved!", reply_markup=admin_keyboard())
-            context.user_data.clear()
+        # ... बाकी के पुराने फीचर्स वैसे ही रहने दें ...
         elif text == "🔙 Back":
             context.user_data.clear(); await start(update, context); return
 
-    # --- USER SECTION ---
-    if text == "🎮 Games":
-        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
-        await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
-    elif text == "🔑 My Keys":
-        keys = get_user_keys(user_id)
-        if not keys: await update.message.reply_text("No keys found!")
-        else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
-    elif text == "📞 Support":
-        await update.message.reply_text(f"📞 Contact: {SUPPORT_USERNAME}")
-    elif text == "💳 Payment":
-        await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
-    
-    # SECURITY: सिर्फ पेमेंट स्क्रीनशॉट ही प्रोसेस करें
-    elif update.message.photo and user_id != ADMIN_ID:
-        g = context.user_data.get("game", "N/A")
-        p = context.user_data.get("plan", "N/A")
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
-                                     caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", 
-                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}")]]))
-        await update.message.reply_text("✅ Screenshot sent!")
-
-async def button_click(update, context):
-    query = update.callback_query
-    await query.answer()
-    if query.data.startswith("game_"):
-        game = query.data.split("_")[1]
-        context.user_data["game"] = game
-        kb = [[InlineKeyboardButton(f"{p} - ₹{pr} ({get_stock_count(game, p)} Left)", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
-        await query.message.reply_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
-    elif query.data.startswith("pay_"):
-        data = query.data.split("_")
-        plan, price, game = data[1], data[2], context.user_data.get("game")
-        context.user_data["plan"] = plan
-        try:
-            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send screenshot.", parse_mode="Markdown")
-        except: await query.message.reply_text("⚠️ QR file not found!")
-    elif query.data.startswith("acc_"):
-        data = query.data.split("_")
-        uid, game, plan = int(data[1]), data[2], data[3]
-        key = approve_and_assign_key(uid, game, plan)
-        if key:
-            await context.bot.send_message(uid, f"✅ *Payment Approved!*\n\n🎮 {game}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
-            await query.edit_message_caption(caption=f"✅ Approved! Key: {key}")
-        else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
+    # (बाकी सारा पुराना यूजर लॉजिक यहाँ जोड़ दें)
 
 def main():
     create_tables()
     app = Application.builder().token(TOKEN).concurrent_updates(True).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
-    app.add_handler(CallbackQueryHandler(button_click))
+    # ... (बाकी का हैंडलर यहाँ जोड़ दें)
     app.run_polling()
 
 if __name__ == "__main__":
