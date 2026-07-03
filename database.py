@@ -11,7 +11,6 @@ def create_tables():
     conn.commit()
     conn.close()
 
-# ब्रॉडकास्ट फीचर
 def get_all_user_ids():
     conn = get_conn()
     cur = conn.cursor()
@@ -20,7 +19,6 @@ def get_all_user_ids():
     conn.close()
     return ids
 
-# Delete Key फीचर - यह फंक्शन जोड़ना जरूरी है
 def delete_key_by_id(key_id):
     conn = get_conn()
     cur = conn.cursor()
@@ -28,7 +26,6 @@ def delete_key_by_id(key_id):
     conn.commit()
     conn.close()
 
-# Key Report with ID - यह फंक्शन भी जरूरी है
 def get_all_keys_report_with_id():
     conn = get_conn()
     cur = conn.cursor()
@@ -64,6 +61,22 @@ def get_total_users():
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM users")
+    count = cur.fetchone()[0]
+    conn.close()
+    return count
+
+def get_sold_keys_count():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM keys WHERE used=1")
+    count = cur.fetchone()[0]
+    conn.close()
+    return count
+
+def get_total_available_keys():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM keys WHERE used=0")
     count = cur.fetchone()[0]
     conn.close()
     return count
