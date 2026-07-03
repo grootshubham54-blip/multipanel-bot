@@ -1,4 +1,4 @@
-Import sqlite3
+import sqlite3
 
 def get_conn():
     return sqlite3.connect("bot_database.db")
@@ -10,6 +10,15 @@ def create_tables():
     cur.execute("CREATE TABLE IF NOT EXISTS keys (id INTEGER PRIMARY KEY AUTOINCREMENT, game TEXT, plan TEXT, key TEXT, used INTEGER DEFAULT 0, user_id INTEGER)")
     conn.commit()
     conn.close()
+
+# ब्रॉडकास्ट फीचर के लिए नया फंक्शन
+def get_all_user_ids():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM users")
+    ids = [row[0] for row in cur.fetchall()]
+    conn.close()
+    return ids
 
 def save_key(game, key, plan):
     conn = get_conn()
@@ -53,7 +62,6 @@ def get_all_keys_report():
 def approve_and_assign_key(user_id, game, plan):
     conn = get_conn()
     cur = conn.cursor()
-    # Strip का उपयोग किया गया है ताकि डेटा मैचिंग में गड़बड़ न हो
     cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game.strip(), plan.strip()))
     row = cur.fetchone()
     if row:
