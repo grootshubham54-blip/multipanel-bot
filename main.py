@@ -8,8 +8,8 @@ logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
 
-# अपना Username और UPI ID यहाँ लिखें
-SUPPORT_USERNAME = "@YourUsername" 
+# आपका यूजरनेम यहाँ अपडेटेड है
+SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
 GAME_PLANS = {
@@ -34,7 +34,6 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
-    # एडमिन फ्लो
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
@@ -71,7 +70,6 @@ async def message_handler(update, context):
             await start(update, context)
             return
 
-    # यूजर बटन लॉजिक
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
