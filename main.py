@@ -5,7 +5,7 @@ from database import *
 
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
-ADMIN_ID = 7908981593
+ADMIN_ID = 7908981593 # आपका एडमिन ID
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
@@ -37,6 +37,16 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
+    # Broadcast Logic (फिक्स किया गया)
+    if context.user_data.get("state") == "broadcasting":
+        users = get_all_users() # सुनिश्चित करें कि database.py में यह फंक्शन मौजूद है
+        for u in users:
+            try: await context.bot.send_message(u, text)
+            except: pass
+        await update.message.reply_text("✅ Broadcast Sent to all users!", reply_markup=admin_keyboard())
+        context.user_data.clear()
+        return
+
     if text == "🔙 Back":
         context.user_data.clear()
         await start(update, context)
@@ -44,6 +54,9 @@ async def message_handler(update, context):
 
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        elif text == "📢 Broadcast":
+            context.user_data["state"] = "broadcasting"
+            await update.message.reply_text("Please send the message you want to broadcast:")
         elif text == "🔑 Add Keys":
             context.user_data["state"] = "select_game"
             kb = [[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]]
@@ -103,6 +116,7 @@ async def message_handler(update, context):
             sold = get_sold_keys_count()
             await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
 
+    # User Section
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
