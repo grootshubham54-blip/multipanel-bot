@@ -14,6 +14,16 @@ def create_tables():
     conn.commit()
     conn.close()
 
+# यह रहा नया फंक्शन जो ब्रॉडकास्ट के लिए जरूरी है
+def get_all_users():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM users")
+    users = [row[0] for row in cur.fetchall()]
+    conn.close()
+    return users
+
+# बाकी सभी पुराने फंक्शन्स वैसे ही हैं, कोई छेड़छाड़ नहीं की गई है
 def get_all_keys_export():
     conn = get_conn()
     cur = conn.cursor()
