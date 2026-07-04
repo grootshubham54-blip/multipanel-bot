@@ -5,7 +5,7 @@ from database import *
 
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
-ADMIN_ID = 7908981593 # आपका एडमिन ID
+ADMIN_ID = 7908981593 
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
@@ -21,29 +21,37 @@ GAME_PLANS = {
 def admin_keyboard():
     return ReplyKeyboardMarkup([
         ["🔑 Add Keys", "📊 Stock"], 
-        ["📊 Sales Dashboard", "📜 Key Report"], 
-        ["📂 Export Data", "🔄 Resend Key"],
-        ["📢 Broadcast", "💾 Backup DB"],
-        ["🗑 Delete Key", "🔙 Back"]
+        ["📊 Sales Dashboard", "👥 Total Users"], 
+        ["📜 Key Report", "🔄 Resend Key"],
+        ["📂 Export Data", "📢 Broadcast"],
+        ["💾 Backup DB", "🗑 Delete Key"],
+        ["🔙 Back"]
     ], resize_keyboard=True)
 
 async def start(update, context):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    # यूजर को डेटाबेस में सेव करने का लॉजिक
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user.id, user.username or "N/A"))
+    conn.commit()
+    conn.close()
+    
     kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
-    if user_id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
+    if user.id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
     await update.message.reply_text("👋 Welcome!", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
-    # Broadcast Logic (फिक्स किया गया)
+    # Broadcast Logic
     if context.user_data.get("state") == "broadcasting":
-        users = get_all_users() # सुनिश्चित करें कि database.py में यह फंक्शन मौजूद है
+        users = get_all_users()
         for u in users:
             try: await context.bot.send_message(u, text)
             except: pass
-        await update.message.reply_text("✅ Broadcast Sent to all users!", reply_markup=admin_keyboard())
+        await update.message.reply_text("✅ Broadcast Sent!", reply_markup=admin_keyboard())
         context.user_data.clear()
         return
 
@@ -56,7 +64,9 @@ async def message_handler(update, context):
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
             context.user_data["state"] = "broadcasting"
-            await update.message.reply_text("Please send the message you want to broadcast:")
+            await update.message.reply_text("Send your Broadcast message:")
+        elif text == "👥 Total Users":
+            await update.message.reply_text(f"👥 *Total Users:* {get_total_users()}", parse_mode="Markdown")
         elif text == "🔑 Add Keys":
             context.user_data["state"] = "select_game"
             kb = [[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]]
@@ -97,26 +107,23 @@ async def message_handler(update, context):
         elif context.user_data.get("state") == "resend_uid":
             try:
                 uid = int(text)
-                context.user_data["target_uid"] = uid
                 keys = get_key_by_user_id(uid)
                 if keys:
                     msg = "\n".join([f"🎮 {g} ({p}): `{k}`" for g, p, k in keys])
                     context.user_data["resend_msg"] = msg
                     context.user_data["state"] = "confirm_resend"
+                    context.user_data["target_uid"] = uid
                     await update.message.reply_text(f"Found:\n{msg}\n\nConfirm to resend?", reply_markup=ReplyKeyboardMarkup([["✅ Confirm Resend", "🔙 Back"]], resize_keyboard=True))
                 else: await update.message.reply_text("⚠️ No keys found."); context.user_data.clear()
             except: await update.message.reply_text("⚠️ Invalid ID."); context.user_data.clear()
         elif context.user_data.get("state") == "confirm_resend" and text == "✅ Confirm Resend":
-            uid = context.user_data.get("target_uid")
-            msg = context.user_data.get("resend_msg")
-            await context.bot.send_message(uid, f"🔄 *Your key has been resent:*\n\n{msg}", parse_mode="Markdown")
+            await context.bot.send_message(context.user_data["target_uid"], f"🔄 *Your key has been resent:*\n\n{context.user_data['resend_msg']}", parse_mode="Markdown")
             await update.message.reply_text("✅ Sent successfully!", reply_markup=admin_keyboard())
             context.user_data.clear()
         elif text == "📊 Sales Dashboard":
             sold = get_sold_keys_count()
             await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
 
-    # User Section
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
