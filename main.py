@@ -6,7 +6,6 @@ from database import *
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593 
-# यहाँ आपका सही यूजरनेम अपडेट कर दिया गया है:
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
@@ -157,32 +156,4 @@ async def button_click(update, context):
             with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send screenshot.", parse_mode="Markdown")
         except: await query.message.reply_text("⚠️ QR file not found!")
     
-    elif query.data.startswith(("acc_", "rej_")):
-        data = query.data.split("_")
-        action, uid, game, plan = data[0], int(data[1]), data[2], data[3]
-        if action == "acc":
-            key = approve_and_assign_key(uid, game, plan)
-            if key:
-                success_msg = (f"🎉 *Payment Received Successfully!*\n\n📦 *Game:* {game}\n⏳ *Plan:* {plan}\n🔑 *Key:* `{key}`")
-                await context.bot.send_message(uid, success_msg, parse_mode="Markdown")
-                await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
-            else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
-        elif action == "rej":
-            reject_msg = (f"❌ *Payment Rejected*\n\n"
-                          f"Unfortunately, your payment has been declined or the screenshot is invalid.\n"
-                          f"Please check your payment and try again.\n\n"
-                          f"🎮 *Game:* {game}\n⏳ *Plan:* {plan}\n\n"
-                          f"For support, contact: {SUPPORT_USERNAME}")
-            await context.bot.send_message(uid, reject_msg, parse_mode="Markdown")
-            await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
-
-def main():
-    create_tables()
-    app = Application.builder().token(TOKEN).concurrent_updates(True).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
-    app.add_handler(CallbackQueryHandler(button_click))
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+    elif query.data.
