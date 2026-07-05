@@ -36,6 +36,7 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
+    # यहाँ नए बटन नाम अपडेट किए गए हैं
     kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
     if user.id == ADMIN_ID: kb.append(["⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦"])
     await update.message.reply_text("👋 Welcome!", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
@@ -167,16 +168,10 @@ async def button_click(update, context):
                 await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
             else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
         elif action == "rej":
-            reject_msg = (f"❌ 𝗣𝗮𝘆𝗺𝗲𝗻𝘁 𝗥𝗲𝗷𝗲𝗰𝘁𝗲𝗱\n\n"
-                          f"Unfortunately, your payment could not be verified or the submitted screenshot is invalid.\n\n"
-                          f"Please ensure that:\n"
-                          f"• The payment was completed successfully.\n"
-                          f"• The screenshot is clear and unedited.\n"
-                          f"• The transaction details are fully visible.\n"
-                          f"• The transaction ID is valid and matches the payment amount.\n\n"
-                          f"⚠️ Any attempt to submit fake, edited, reused, or fraudulent payment screenshots may result in your account being permanently restricted from using this bot.\n\n"
-                          f"🔄 Please review your payment details and submit a valid screenshot to continue.")
-            await context.bot.send_message(uid, reject_msg)
+            reject_msg = (f"❌ *Payment Rejected*\n\n"
+                          f"Unfortunately, your payment has been declined or the screenshot is invalid.\n"
+                          f"Please check your payment and try again.")
+            await context.bot.send_message(uid, reject_msg, parse_mode="Markdown")
             await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
 
 def main():
