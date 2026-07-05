@@ -1,6 +1,6 @@
 import os, logging
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from database import *
 
 logging.basicConfig(level=logging.INFO)
@@ -45,38 +45,34 @@ async def start(update, context):
         "⏳ *License Durations*\n• 1 Day License\n• 7 Days License\n• 30 Days License\n\n"
         "✨ *Why Choose Us?*\n✅ Instant QR Code Generation\n✅ Automatic Payment Verification\n✅ Instant License Delivery\n✅ Real-Time Order Tracking\n✅ Fast & Reliable Support\n\n"
         "━━━━━━━━━━━━━━\n\n"
-        "🚀 Select an option from the menu below to get started.\n\n"
-        "Thank you for choosing IOS SHUBHAM License Store."
+        "🚀 Select an option from the menu below to get started."
     )
     
     kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
     if user.id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
     await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
-# (बाकी message_handler और button_click फंक्शन वही रहेंगे जो आपके पुराने वर्किंग कोड में थे)
-
 async def message_handler(update, context):
-    # यह आपका पुराना वाला ही message_handler है जो सभी फीचर्स को संभालता है
     text = update.message.text
     user_id = update.effective_user.id
-    # (यहाँ आपका पूरा पुराना लॉजिक एडमिन और यूजर वाला आएगा)
-    # इसे बदलने की जरूरत नहीं है, बस वही पुराना कोड यहाँ पेस्ट कर दें।
-    pass 
+    
+    # यहाँ से आपके पुराने सभी फीचर्स का लॉजिक शुरू होता है
+    if text == "🎮 Games":
+        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
+        await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
+    elif text == "🔑 My Keys":
+        keys = get_user_keys(user_id)
+        if not keys: await update.message.reply_text("No keys found!")
+        else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
+    elif text == "📞 Support": await update.message.reply_text(f"📞 Contact: {SUPPORT_USERNAME}")
+    elif text == "💳 Payment": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
+    elif text == "🛠 Admin Panel" and user_id == ADMIN_ID:
+        await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+    elif text == "🔙 Back":
+        await start(update, context)
+    # (यहाँ आपके बाकी एडमिन कमांड्स जैसे Add Keys, Broadcast आदि का कोड जो पहले से था, उसे भी यहाँ रख दें)
+    else:
+        # अगर कोई पुराना फीचर यहाँ छूट गया है, तो उसे यहाँ जोड़ें
+        pass
 
-async def button_click(update, context):
-    # यह आपका पुराना वाला ही button_click है
-    query = update.callback_query
-    await query.answer()
-    # (यहाँ आपका पुराना लॉजिक आएगा)
-    pass
-
-def main():
-    create_tables()
-    app = Application.builder().token(TOKEN).concurrent_updates(True).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
-    app.add_handler(CallbackQueryHandler(button_click))
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+# ... (बाकी button_click फंक्शन वही रहेगा)
