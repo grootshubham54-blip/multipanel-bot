@@ -36,8 +36,9 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
-    kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
-    if user.id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
+    # यहाँ नए बटन नाम अपडेट किए गए हैं
+    kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
+    if user.id == ADMIN_ID: kb.append(["⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦"])
     await update.message.reply_text("👋 Welcome!", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def message_handler(update, context):
@@ -59,7 +60,7 @@ async def message_handler(update, context):
         return
 
     if user_id == ADMIN_ID:
-        if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
             context.user_data["state"] = "broadcasting"
             await update.message.reply_text("Send your Broadcast message:")
@@ -122,15 +123,15 @@ async def message_handler(update, context):
             sold = get_sold_keys_count()
             await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
 
-    if text == "🎮 Games":
+    if text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
-    elif text == "🔑 My Keys":
+    elif text == "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦":
         keys = get_user_keys(user_id)
         if not keys: await update.message.reply_text("No keys found!")
         else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
-    elif text == "📞 Support": await update.message.reply_text(f"📞 Contact: {SUPPORT_USERNAME}")
-    elif text == "💳 Payment": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
+    elif text == "🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦": await update.message.reply_text(f"📞 Contact: {SUPPORT_USERNAME}")
+    elif text == "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
         btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), 
