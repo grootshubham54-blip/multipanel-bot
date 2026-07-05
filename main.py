@@ -1,6 +1,6 @@
 import os, logging
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from database import *
 
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +27,13 @@ def get_main_menu(is_admin=False):
         kb.append([InlineKeyboardButton("🛠 Admin Panel", callback_data="menu_admin")])
     return InlineKeyboardMarkup(kb)
 
+def admin_keyboard():
+    return ReplyKeyboardMarkup([
+        ["🔑 Add Keys", "📊 Stock"], ["📊 Sales Dashboard", "👥 Total Users"], 
+        ["📜 Key Report", "🔄 Resend Key"], ["📂 Export Data", "📢 Broadcast"],
+        ["💾 Backup DB", "🗑 Delete Key"], ["🔙 Main Menu"]
+    ], resize_keyboard=True)
+
 async def start(update, context):
     user = update.effective_user
     conn = get_conn()
@@ -35,19 +42,52 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
-    # आपका नया वेलकम मैसेज
     welcome_text = (
         "🎮 *Welcome to IOS SHUBHAM License Store*\n\n"
         "Your trusted destination for premium gaming licenses.\n\n"
         "━━━━━━━━━━━━━━\n\n"
         "📦 *Available Products*\n• KINGIOS\n• WINIOS\n• NEXT IOS\n• Mars Loader\n• DEADEYE\n• DOLPHIN IOS\n\n"
-        "⏳ *License Durations*\n• 1 Day License\n• 7 Days License\n• 30 Days License\n\n"
-        "✨ *Why Choose Us?*\n✅ Instant QR Code Generation\n✅ Automatic Payment Verification\n✅ Instant License Delivery\n✅ Real-Time Order Tracking\n✅ Fast & Reliable Support\n\n"
-        "━━━━━━━━━━━━━━\n\n"
-        "🚀 Select an option from the menu below to get started.\n\n"
-        "Thank you for choosing IOS SHUBHAM License Store."
+        "🚀 Select an option from the menu below to get started."
     )
-    
     await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=get_main_menu(user.id == ADMIN_ID))
 
-# (बाकी button_click और message_handler कोड वही रहेगा जो पहले था)
+async def button_click(update, context):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "menu_games":
+        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
+        await query.edit_message_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
+    elif query.data == "menu_admin":
+        await query.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+    elif query.data == "menu_keys":
+        keys = get_user_keys(query.from_user.id)
+        msg = "\n".join([f"{g} ({p}): {k}" for g, p, k in keys]) if keys else "No keys found!"
+        await query.edit_message_text(f"🔑 *Your Keys:*\n\n{msg}", parse_mode="Markdown")
+    # बाकी लॉजिक वही है...
+    elif query.data.startswith("game_"):
+        game = query.data.split("_")[1]
+        context.user_data["game"] = game
+        kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
+        await query.edit_message_text(f"🎮 {game}\nSelect Plan:", reply_markup=InlineKeyboardMarkup(kb))
+    elif query.data.startswith("pay_"):
+        # यहाँ फोटो और QR वाला लॉजिक आएगा
+        pass
+
+async def message_handler(update, context):
+    text = update.message.text
+    if text == "🔙 Main Menu":
+        await start(update, context)
+        return
+    # यहाँ एडमिन के सारे पुराने कमांड्स का लॉजिक (Add Keys, Broadcast, आदि) डालें
+    # जो आपके पिछले कोड में थे।
+
+def main():
+    create_tables()
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_click))
+    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
