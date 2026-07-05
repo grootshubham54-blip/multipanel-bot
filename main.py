@@ -10,12 +10,12 @@ SUPPORT_USERNAME = "@IOS_HACK_S"
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
 GAME_PLANS = {
-    "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
-    "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
-    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "130", "1 Week": "599"},
-    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
-    "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
+    "👑 ✦ 𝕂𝕀ℕ𝔾 𝕚𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
+    "⭐️ ✦ 𝕎𝕀ℕ𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
+    "🚀 ✦ ℕ𝔼𝕏𝕋 𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800"},
+    "🪐 ✦ 𝕄𝕒𝕣𝕤 𝕃𝕠𝕒𝕕𝕖𝕣 ✦": {"1 Day": "130", "1 Week": "599"},
+    "💀 ✦ 𝔻𝔼𝔸𝔻𝔼𝕐𝔼 ✦": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
+    "🐬 ✦ 𝔻𝕆𝕃ℙℍ𝕀ℕ 𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
 }
 
 def admin_keyboard():
