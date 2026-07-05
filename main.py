@@ -1,6 +1,6 @@
 import os, logging
-from telegram import ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from database import *
 
 logging.basicConfig(level=logging.INFO)
@@ -9,7 +9,15 @@ ADMIN_ID = 7908981593
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
-# एडमिन कीबोर्ड
+GAME_PLANS = {
+    "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
+    "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
+    "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
+    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "130", "1 Week": "599"},
+    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
+    "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
+}
+
 def admin_keyboard():
     return ReplyKeyboardMarkup([
         ["🔑 Add Keys", "📊 Stock"], 
@@ -20,22 +28,15 @@ def admin_keyboard():
         ["🔙 Back"]
     ], resize_keyboard=True)
 
-# मुख्य यूजर कीबोर्ड
-def main_keyboard(user_id):
-    kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
-    if user_id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
-    return ReplyKeyboardMarkup(kb, resize_keyboard=True)
-
 async def start(update, context):
     user = update.effective_user
-    # डेटाबेस में यूजर सेव करें
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user.id, user.username or "N/A"))
     conn.commit()
     conn.close()
     
-    # आपका वेलकम मैसेज
+    # यहाँ आपका नया वेलकम मैसेज जोड़ा गया है
     welcome_text = (
         "🎮 *Welcome to IOS SHUBHAM License Store*\n\n"
         "Your trusted destination for premium gaming licenses.\n\n"
@@ -48,38 +49,9 @@ async def start(update, context):
         "Thank you for choosing IOS SHUBHAM License Store."
     )
     
-    await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=main_keyboard(user.id))
+    kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
+    if user.id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
+    await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
-async def message_handler(update, context):
-    text = update.message.text
-    user_id = update.effective_user.id
-    
-    # यहाँ आपके पुराने सभी बटन्स का लॉजिक है
-    if text == "🎮 Games":
-        # अगर आपके 'Games' के लिए कोई इनलाइन बटन हैं तो वो दिखाएं
-        await update.message.reply_text("Select a Game from the list above or contact support.")
-    elif text == "🔑 My Keys":
-        keys = get_user_keys(user_id)
-        if not keys: await update.message.reply_text("No keys found!")
-        else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
-    elif text == "📞 Support": 
-        await update.message.reply_text(f"📞 Contact: {SUPPORT_USERNAME}")
-    elif text == "💳 Payment": 
-        await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
-    elif text == "🛠 Admin Panel" and user_id == ADMIN_ID:
-        await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
-    elif text == "🔙 Back":
-        await start(update, context)
-    # बाकी एडमिन कमांड्स यहाँ जोड़ें (Add Keys, Stock आदि)
-    
-def main():
-    create_tables()
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT, message_handler))
-    # अगर आप फोटो से पेमेंट ले रहे हैं
-    app.add_handler(MessageHandler(filters.PHOTO, message_handler)) 
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+# आपके बाकी सभी फंक्शन (message_handler, button_click आदि) वही रहेंगे जो आपने पहले भेजे थे।
+# नीचे अपना पिछला बाकी कोड वैसा ही रहने दें।
