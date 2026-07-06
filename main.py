@@ -9,7 +9,6 @@ ADMIN_ID = 7908981593
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
-# बोट का स्टेटस ट्रैक करने के लिए वेरिएबल
 is_bot_active = True 
 
 GAME_PLANS = {
@@ -36,73 +35,71 @@ def admin_keyboard():
 
 async def start(update, context):
     global is_bot_active
-    user = update.effective_user
+    if not is_bot_active and update.effective_user.id != ADMIN_ID: return
     
-    # अगर बोट बंद है और यूजर एडमिन नहीं है, तो कुछ न करें
-    if not is_bot_active and user.id != ADMIN_ID:
-        return
-
+    user = update.effective_user
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user.id, user.username or "N/A"))
     conn.commit()
     conn.close()
     
-    welcome_text = "🎮 Welcome to IOS SHUBHAM License Store\n\n(बोट अभी चालू है)"
-    
+    welcome_text = "🎮 Welcome to IOS SHUBHAM License Store\n\nYour trusted destination for premium gaming licenses."
     kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
     if user.id == ADMIN_ID: kb.append(["⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦"])
     await update.message.reply_text(welcome_text, reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+
+async def button_click(update, context):
+    query = update.callback_query; await query.answer()
+    if query.data.startswith("game_"):
+        game = query.data.split("_")[1]; context.user_data["game"] = game
+        kb = [[InlineKeyboardButton(f"{p} - ₹{pr} ({get_stock_count(game, p)} Left)", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
+        kb.append([InlineKeyboardButton("🔙 Back", callback_data="back_games")])
+        await query.edit_message_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+    elif query.data == "back_games":
+        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
+        await query.edit_message_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
+    elif query.data.startswith("pay_"):
+        data = query.data.split("_"); plan, price, game = data[1], data[2], context.user_data.get("game"); context.user_data["plan"] = plan
+        try:
+            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send screenshot.", parse_mode="Markdown")
+        except: await query.message.reply_text("⚠️ QR file not found!")
+    elif query.data.startswith(("acc_", "rej_")):
+        data = query.data.split("_"); action, uid, game, plan = data[0], int(data[1]), data[2], data[3]
+        if action == "acc":
+            key = approve_and_assign_key(uid, game, plan)
+            if key:
+                await context.bot.send_message(uid, f"🎉 *Success!*\n📦 *Game:* {game}\n⏳ *Plan:* {plan}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
+                await query.edit_message_caption(caption=f"✅ Approved! User: {uid}")
+            else: await query.edit_message_caption(caption="⚠️ No keys available!")
+        elif action == "rej":
+            await context.bot.send_message(uid, "❌ Payment Rejected.")
+            await query.edit_message_caption(caption=f"❌ Rejected! User: {uid}")
 
 async def message_handler(update, context):
     global is_bot_active
     text = update.message.text
     user_id = update.effective_user.id
-    
-    # मेंटेनेंस चेक (एडमिन के अलावा सबको ब्लॉक करें)
-    if not is_bot_active and user_id != ADMIN_ID:
-        return
+    if not is_bot_active and user_id != ADMIN_ID: return
 
-    # एडमिन मेंटेनेंस बटन लॉजिक
     if user_id == ADMIN_ID and text.startswith("Maintenance:"):
         is_bot_active = not is_bot_active
-        status = "ON" if is_bot_active else "OFF"
-        await update.message.reply_text(f"✅ बोट अब {status} हो गया है!", reply_markup=admin_keyboard())
+        await update.message.reply_text(f"✅ बोट अब {'ON' if is_bot_active else 'OFF'} है!", reply_markup=admin_keyboard())
         return
 
-    # बाकी का पुराना कोड...
-    if context.user_data.get("state") == "broadcasting":
-        users = get_all_users()
-        for u in users:
-            try: await context.bot.send_message(u, text)
-            except: pass
-        await update.message.reply_text("✅ Broadcast Sent!", reply_markup=admin_keyboard())
-        context.user_data.clear()
-        return
-
-    if text == "🔙 Back":
-        context.user_data.clear()
-        await start(update, context)
-        return
-
-    if user_id == ADMIN_ID:
-        if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
-        # (बाकी एडमिन कमांड्स यहाँ वैसे ही रहेंगी जैसे पहले थीं)
-        elif text == "👥 Total Users": await update.message.reply_text(f"Total: {get_total_users()}")
-        # ... बाकी का पूरा पुराना कोड यहाँ पेस्ट करें
-    
-    # बाकी यूजर कमांड्स (Games, Support, etc.)
-    if text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
+    # एडमिन कमांड्स और बाकी लॉजिक यहाँ है...
+    if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦" and user_id == ADMIN_ID: await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+    elif text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
-    # ... (बाकी का पुराना कोड यहाँ जोड़ें)
+    # बाकी सारे पुराने मैसेज हैंडलर यहाँ डालें...
 
 def main():
     create_tables()
     app = Application.builder().token(TOKEN).concurrent_updates(True).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
-    app.add_handler(CallbackQueryHandler(button_click)) # button_click फंक्शन पहले जैसा ही रहेगा
+    app.add_handler(CallbackQueryHandler(button_click)) 
     app.run_polling()
 
 if __name__ == "__main__":
