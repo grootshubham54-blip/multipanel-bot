@@ -9,6 +9,9 @@ ADMIN_ID = 7908981593
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
+# मेंटेनेंस मोड के लिए वेरिएबल
+is_bot_active = True 
+
 GAME_PLANS = {
     "👑 ✦ 𝕂𝕀ℕ𝔾 𝕚𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
     "⭐️ ✦ 𝕎𝕀ℕ𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
@@ -19,16 +22,22 @@ GAME_PLANS = {
 }
 
 def admin_keyboard():
+    global is_bot_active
+    status = "ON" if is_bot_active else "OFF"
     return ReplyKeyboardMarkup([
         ["🔑 Add Keys", "📊 Stock"], 
         ["📊 Sales Dashboard", "👥 Total Users"], 
         ["📜 Key Report", "🔄 Resend Key"],
         ["📂 Export Data", "📢 Broadcast"],
         ["💾 Backup DB", "🗑 Delete Key"],
+        [f"Maintenance: {status}"], # यह नया बटन है
         ["🔙 Back"]
     ], resize_keyboard=True)
 
 async def start(update, context):
+    global is_bot_active
+    if not is_bot_active and update.effective_user.id != ADMIN_ID: return
+    
     user = update.effective_user
     conn = get_conn()
     cur = conn.cursor()
@@ -36,7 +45,6 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
-    # आपका नया वेलकम मैसेज यहाँ है
     welcome_text = (
         "🎮 Welcome to IOS SHUBHAM License Store\n\n"
         "Your trusted destination for premium gaming licenses.\n\n"
@@ -61,9 +69,18 @@ async def start(update, context):
     await update.message.reply_text(welcome_text, reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def message_handler(update, context):
+    global is_bot_active
     text = update.message.text
     user_id = update.effective_user.id
     
+    if not is_bot_active and user_id != ADMIN_ID: return
+
+    if user_id == ADMIN_ID and text.startswith("Maintenance:"):
+        is_bot_active = not is_bot_active
+        await update.message.reply_text(f"✅ बोट मेंटेनेंस मोड {'ON' if is_bot_active else 'OFF'} कर दिया गया है!", reply_markup=admin_keyboard())
+        return
+
+    # [आपका मूल कोडिंग यहाँ से आगे बिना किसी बदलाव के जारी है]
     if context.user_data.get("state") == "broadcasting":
         users = get_all_users()
         for u in users:
