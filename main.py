@@ -3,10 +3,10 @@ from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardBu
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from database import *
 
-# Logging को पूरी तरह बंद कर दिया है ताकि फालतू डेटा प्रोसेस न हो
+# Logging को कम किया गया है ताकि बोट फास्ट रहे
 logging.disable(logging.CRITICAL)
 
-TOKEN = os.getenv("BOT_TOKEN") 
+TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 7908981593 
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
@@ -40,7 +40,6 @@ async def start(update, context):
     if not is_bot_active and update.effective_user.id != ADMIN_ID: return
     
     user = update.effective_user
-    # डेटाबेस ऑपरेशंस को कम किया है ताकि रिप्लाई फास्ट आए
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user.id, user.username or "N/A"))
@@ -50,19 +49,8 @@ async def start(update, context):
     welcome_text = (
         "🎮 Welcome to IOS SHUBHAM License Store\n\n"
         "Your trusted destination for premium gaming licenses.\n\n"
-        "━━━━━━━━━━━━━━\n\n"
-        "📦 Available Products\n"
-        "• KINGIOS\n• WINIOS\n• NEXT IOS\n• Mars Loader\n• DEADEYE\n• DOLPHIN IOS\n\n"
-        "⏳ License Durations\n"
-        "• 1 Day License\n• 7 Days License\n• 30 Days License\n\n"
-        "✨ Why Choose Us?\n"
-        "✅ Instant QR Code Generation\n"
-        "✅ Automatic Payment Verification\n"
-        "✅ Instant License Delivery\n"
-        "✅ Real-Time Order Tracking\n"
-        "✅ Fast & Reliable Support\n\n"
-        "━━━━━━━━━━━━━━\n\n"
-        "🚀 Select an option from the menu below to get started."
+        "📦 Available Products: KINGIOS, WINIOS, NEXT IOS, Mars Loader, DEADEYE, DOLPHIN IOS\n\n"
+        "🚀 Select an option from the menu below."
     )
     
     kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝗼𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
@@ -75,26 +63,72 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
-    if not is_bot_active and user_id != ADMIN_ID: return
+    if text == "🔙 Back":
+        context.user_data.clear()
+        await start(update, context)
+        return
 
-    # (कोड का बाकी हिस्सा वैसा ही है, इसे रिप्लेस कर दें)
-    # ... (आपका पिछला लॉजिक यहाँ रखें) ...
-    if text == "🔙 Back": await start(update, context)
-    # बाकी सारे फीचर्स यहाँ मौजूद हैं जो पहले थे
+    # Admin Panel & Features
+    if user_id == ADMIN_ID:
+        if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        elif text == "📢 Broadcast":
+            context.user_data["state"] = "broadcasting"
+            await update.message.reply_text("Send your message:")
+        elif text == "🔑 Add Keys":
+            context.user_data["state"] = "select_game"
+            kb = [[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]]
+            await update.message.reply_text("Select Game:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+        elif context.user_data.get("state") == "select_game":
+            context.user_data["add_game"] = text
+            context.user_data["state"] = "select_plan"
+            kb = [[p] for p in GAME_PLANS[text].keys()] + [["🔙 Back"]]
+            await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+        elif context.user_data.get("state") == "add_keys":
+            for k in text.split("\n"):
+                if k.strip(): save_key(context.user_data["add_game"], k.strip(), context.user_data["add_plan"])
+            await update.message.reply_text("✅ Keys Saved!", reply_markup=admin_keyboard())
+            context.user_data.clear()
+        elif text == "📊 Stock":
+            msg = "📊 *Current Stock:*\n\n"
+            for g, plans in GAME_PLANS.items():
+                msg += f"*{g}:*\n"
+                for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
+            await update.message.reply_text(msg, parse_mode="Markdown")
+
+    if text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
+        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
+        await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
+    elif text == "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦": await update.message.reply_text(f"💳 Payment:\n{PAYMENT_DETAILS}")
+    elif update.message.photo and user_id != ADMIN_ID:
+        g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
+        btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), 
+                 InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{g}_{p}")]]
+        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", reply_markup=InlineKeyboardMarkup(btns))
+        await update.message.reply_text("✅ Screenshot sent!")
+
+async def button_click(update, context):
+    query = update.callback_query; await query.answer()
+    if query.data.startswith("game_"):
+        game = query.data.split("_")[1]; context.user_data["game"] = game
+        kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
+        await query.edit_message_text(f"🎮 {game}\nSelect plan:", reply_markup=InlineKeyboardMarkup(kb))
+    elif query.data.startswith("acc_"):
+        data = query.data.split("_"); uid, game, plan = int(data[1]), data[2], data[3]
+        key = approve_and_assign_key(uid, game, plan)
+        if key:
+            await context.bot.send_message(uid, f"🎉 *Success!*\n📦 Game: {game}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
+            await query.edit_message_caption(caption=f"✅ Approved!\nKey: {key}")
+        else:
+            await query.edit_message_caption(caption="⚠️ Stock Empty!")
 
 def main():
     if not TOKEN: return
     create_tables()
-    
-    # 'connect_timeout' और 'pool_timeout' को बहुत कम किया है ताकि रिस्पॉन्स सुपर फास्ट मिले
     app = Application.builder().token(TOKEN).concurrent_updates(True).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
-    
-    # drop_pending_updates=True और timeout को 10 पर सेट किया है (रॉकेट स्पीड)
-    app.run_polling(drop_pending_updates=True, timeout=10, read_timeout=10, write_timeout=10)
+    app.run_polling(drop_pending_updates=True, timeout=5)
 
 if __name__ == "__main__":
     main()
