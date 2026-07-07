@@ -48,7 +48,20 @@ async def start(update, context):
     welcome_text = (
         "🎮 Welcome to IOS SHUBHAM License Store\n\n"
         "Your trusted destination for premium gaming licenses.\n\n"
-        "🚀 Select an option from the menu below to get started."
+        "━━━━━━━━━━━━━━\n\n"
+        "📦 Available Products\n"
+        "• KINGIOS\n• WINIOS\n• NEXT IOS\n• Mars Loader\n• DEADEYE\n• DOLPHIN IOS\n\n"
+        "⏳ License Durations\n"
+        "• 1 Day License\n• 7 Days License\n• 30 Days License\n\n"
+        "✨ Why Choose Us?\n"
+        "✅ Instant QR Code Generation\n"
+        "✅ Automatic Payment Verification\n"
+        "✅ Instant License Delivery\n"
+        "✅ Real-Time Order Tracking\n"
+        "✅ Fast & Reliable Support\n\n"
+        "━━━━━━━━━━━━━━\n\n"
+        "🚀 Select an option from the menu below to get started.\n\n"
+        "Thank you for choosing IOS SHUBHAM License Store."
     )
     
     kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
@@ -62,7 +75,6 @@ async def message_handler(update, context):
     
     if not is_bot_active and user_id != ADMIN_ID: return
 
-    # मेंटेनेंस मोड टॉगल
     if user_id == ADMIN_ID and text.startswith("Maintenance:"):
         is_bot_active = not is_bot_active
         await update.message.reply_text(f"✅ बोट मेंटेनेंस मोड {'ON' if is_bot_active else 'OFF'} कर दिया गया है!", reply_markup=admin_keyboard())
