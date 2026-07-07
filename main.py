@@ -3,8 +3,11 @@ from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKe
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from database import *
 
+# Logging setup
 logging.basicConfig(level=logging.INFO)
-TOKEN = "YOUR_BOT_TOKEN_HERE"  # यहाँ अपना टोकन डालें
+
+# Railway Variables से टोकन उठा रहा है
+TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 7908981593 
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
@@ -51,6 +54,7 @@ async def start(update, context):
 
 async def message_handler(update, context):
     global is_bot_active
+    if not update.message or not update.message.text: return
     text = update.message.text
     user_id = update.effective_user.id
     
@@ -75,7 +79,6 @@ async def message_handler(update, context):
         await start(update, context)
         return
 
-    # Admin Panel Logic
     if user_id == ADMIN_ID:
         if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
@@ -106,7 +109,6 @@ async def message_handler(update, context):
                 for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
             await update.message.reply_text(msg, parse_mode="Markdown")
 
-    # User Logic
     if text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -137,6 +139,9 @@ async def button_click(update, context):
             await query.edit_message_caption(caption="⚠️ Stock Empty!")
 
 def main():
+    if not TOKEN:
+        print("Error: BOT_TOKEN not found in environment variables!")
+        return
     create_tables()
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
