@@ -3,6 +3,7 @@ from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKe
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from database import *
 
+# Logging Setup
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593 
@@ -76,7 +77,7 @@ async def message_handler(update, context):
 
     if user_id == ADMIN_ID and text.startswith("Maintenance:"):
         is_bot_active = not is_bot_active
-        await update.message.reply_text(f"✅ बोट मेंटेनेंस मोड {'ON' if is_bot_active else 'OFF'} कर दिया गया है!", reply_markup=admin_keyboard())
+        await update.message.reply_text(f"✅ बोट मेंटेनेंस मोड {'ON' if is_bot_active else 'OFF'}!", reply_markup=admin_keyboard())
         return
 
     if context.user_data.get("state") == "broadcasting":
@@ -138,59 +139,41 @@ async def message_handler(update, context):
     elif text == "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
-        btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), 
-                 InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{g}_{p}")]]
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
-                                     caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", 
-                                     reply_markup=InlineKeyboardMarkup(btns))
+        btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{g}_{p}")]]
+        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", reply_markup=InlineKeyboardMarkup(btns))
         await update.message.reply_text("✅ Screenshot sent!")
 
 async def button_click(update, context):
     query = update.callback_query; await query.answer()
     if query.data.startswith("game_"):
-        game = query.data.split("_")[1]; context.user_data["game"] = game
-        kb = [[InlineKeyboardButton(f"{p} - ₹{pr} ({get_stock_count(game, p)} Left)", callback_data=f"pay_{p}_{pr}_{game}")] for p, pr in GAME_PLANS[game].items()]
-        kb.append([InlineKeyboardButton("🔙 Back", callback_data="back_games")])
-        await query.edit_message_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
-    elif query.data == "back_games":
-        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
-        await query.edit_message_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
+        game = query.data.split("_", 1)[1]; context.user_data["game"] = game
+        kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}_{pr}_{game}")] for p, pr in GAME_PLANS[game].items()]
+        await query.edit_message_text(f"🎮 *{game}*\nSelect plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
     elif query.data.startswith("pay_"):
         data = query.data.split("_"); plan, price, game = data[1], data[2], data[3]
         context.user_data["plan"] = plan; context.user_data["game"] = game
         try:
-            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send screenshot.", parse_mode="Markdown")
+            with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ Pay ₹{price} for {game} ({plan})")
         except: await query.message.reply_text("⚠️ QR file not found!")
-    
-    elif query.data.startswith(("acc_", "rej_")):
-        data = query.data.split("_")
-        action, uid, game, plan = data[0], int(data[1]), data[2], data[3]
-        if action == "acc":
-            key = approve_and_assign_key(uid, game, plan)
-            if key:
-                success_msg = (f"🎉 *Payment Received Successfully!*\n\n📦 *Game:* {game}\n⏳ *Plan:* {plan}\n🔑 *Key:* `{key}`")
-                await context.bot.send_message(uid, success_msg, parse_mode="Markdown")
-                await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
-            else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
-        elif action == "rej":
-            reject_msg = (f"❌ 𝗣𝗮𝘆𝗺𝗲𝗻𝘁 𝗥𝗲𝗷𝗲𝗰𝘁𝗲𝗱\n\n"
-                          f"Unfortunately, your payment could not be verified or the submitted screenshot is invalid.\n\n"
-                          f"Please ensure that:\n"
-                          f"• The payment was completed successfully.\n"
-                          f"• The screenshot is clear and unedited.\n"
-                          f"• The transaction details are fully visible.\n"
-                          f"• The transaction ID is valid and matches the payment amount.\n\n"
-                          f"⚠️ Any attempt to submit fake, edited, reused, or fraudulent payment screenshots may result in your account being permanently restricted from using this bot.\n\n"
-                          f"🔄 Please review your payment details and submit a valid screenshot to continue.")
-            await context.bot.send_message(uid, reject_msg)
-            await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
+    elif query.data.startswith("acc_"):
+        data = query.data.split("_"); uid, game, plan = int(data[1]), data[2], data[3]
+        key = approve_and_assign_key(uid, game, plan)
+        if key:
+            await context.bot.send_message(uid, f"🎉 *Success!*\nKey: `{key}`", parse_mode="Markdown")
+            await query.edit_message_caption(caption=f"✅ Approved! Key: {key}")
+        else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
+    elif query.data.startswith("rej_"):
+        uid = int(query.data.split("_")[1])
+        await context.bot.send_message(uid, "❌ 𝗣𝗮𝘆𝗺𝗲𝗻𝘁 𝗥𝗲𝗷𝗲𝗰𝘁𝗲𝗱. Please submit a valid screenshot.")
+        await query.edit_message_caption(caption=f"❌ Rejected! User: {uid}")
 
 def main():
     create_tables()
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
+    print("Bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
