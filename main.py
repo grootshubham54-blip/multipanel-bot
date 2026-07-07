@@ -36,11 +36,24 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
+    # आपका नया वेलकम मैसेज यहाँ है
     welcome_text = (
         "🎮 Welcome to IOS SHUBHAM License Store\n\n"
         "Your trusted destination for premium gaming licenses.\n\n"
         "━━━━━━━━━━━━━━\n\n"
-        "🚀 Select an option from the menu below to get started."
+        "📦 Available Products\n"
+        "• KINGIOS\n• WINIOS\n• NEXT IOS\n• Mars Loader\n• DEADEYE\n• DOLPHIN IOS\n\n"
+        "⏳ License Durations\n"
+        "• 1 Day License\n• 7 Days License\n• 30 Days License\n\n"
+        "✨ Why Choose Us?\n"
+        "✅ Instant QR Code Generation\n"
+        "✅ Automatic Payment Verification\n"
+        "✅ Instant License Delivery\n"
+        "✅ Real-Time Order Tracking\n"
+        "✅ Fast & Reliable Support\n\n"
+        "━━━━━━━━━━━━━━\n\n"
+        "🚀 Select an option from the menu below to get started.\n\n"
+        "Thank you for choosing IOS SHUBHAM License Store."
     )
     
     kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
@@ -52,9 +65,9 @@ async def message_handler(update, context):
     user_id = update.effective_user.id
     
     if context.user_data.get("state") == "broadcasting":
-        users = get_all_users() # सुनिश्चित करें कि यह function database.py में सही है
+        users = get_all_users()
         for u in users:
-            try: await context.bot.send_message(u[0], text)
+            try: await context.bot.send_message(u, text)
             except: pass
         await update.message.reply_text("✅ Broadcast Sent!", reply_markup=admin_keyboard())
         context.user_data.clear()
@@ -67,21 +80,21 @@ async def message_handler(update, context):
 
     if user_id == ADMIN_ID:
         if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
-        elif text == "👥 Total Users":
-            count = get_total_users() # सुनिश्चित करें यह int रिटर्न करता है
-            await update.message.reply_text(f"👥 *Total Bot Users:* {count}", parse_mode="Markdown")
         elif text == "📢 Broadcast":
             context.user_data["state"] = "broadcasting"
             await update.message.reply_text("Send your Broadcast message:")
+        elif text == "👥 Total Users":
+            await update.message.reply_text(f"👥 *Total Users:* {get_total_users()}", parse_mode="Markdown")
         elif text == "🔑 Add Keys":
             context.user_data["state"] = "select_game"
             kb = [[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]]
             await update.message.reply_text("Select Game:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
-        elif context.user_data.get("state") == "select_game" and text in GAME_PLANS:
-            context.user_data["add_game"] = text
-            context.user_data["state"] = "select_plan"
-            kb = [[p] for p in GAME_PLANS[text].keys()] + [["🔙 Back"]]
-            await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+        elif context.user_data.get("state") == "select_game":
+            if text in GAME_PLANS:
+                context.user_data["add_game"] = text
+                context.user_data["state"] = "select_plan"
+                kb = [[p] for p in GAME_PLANS[text].keys()] + [["🔙 Back"]]
+                await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
         elif context.user_data.get("state") == "select_plan":
             context.user_data["add_plan"] = text
             context.user_data["state"] = "add_keys"
@@ -97,9 +110,15 @@ async def message_handler(update, context):
                 msg += f"*{g}:*\n"
                 for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
             await update.message.reply_text(msg, parse_mode="Markdown")
-        elif text == "📊 Sales Dashboard":
-            sold = get_sold_keys_count()
-            await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
+        elif text == "💾 Backup DB":
+            path = create_backup()
+            await update.message.reply_text(f"✅ Backup saved at: {path}")
+        elif text == "📂 Export Data":
+            data = get_all_keys_export()
+            with open("keys.csv", "w") as f:
+                f.write("ID,Game,Plan,Key,Used,UserID\n")
+                for r in data: f.write(f"{','.join(map(str, r))}\n")
+            await update.message.reply_document(document=open("keys.csv", "rb"))
         elif text == "🔄 Resend Key":
             context.user_data["state"] = "resend_uid"
             await update.message.reply_text("Enter Customer User ID:")
@@ -119,8 +138,10 @@ async def message_handler(update, context):
             await context.bot.send_message(context.user_data["target_uid"], f"🔄 *Your key has been resent:*\n\n{context.user_data['resend_msg']}", parse_mode="Markdown")
             await update.message.reply_text("✅ Sent successfully!", reply_markup=admin_keyboard())
             context.user_data.clear()
+        elif text == "📊 Sales Dashboard":
+            sold = get_sold_keys_count()
+            await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
 
-    # Public Handlers
     if text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -161,16 +182,26 @@ async def button_click(update, context):
         if action == "acc":
             key = approve_and_assign_key(uid, game, plan)
             if key:
-                await context.bot.send_message(uid, f"🎉 *Payment Received!*\n\n📦 *Game:* {game}\n⏳ *Plan:* {plan}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
+                success_msg = (f"🎉 *Payment Received Successfully!*\n\n📦 *Game:* {game}\n⏳ *Plan:* {plan}\n🔑 *Key:* `{key}`")
+                await context.bot.send_message(uid, success_msg, parse_mode="Markdown")
                 await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
             else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
         elif action == "rej":
-            await context.bot.send_message(uid, "❌ Payment Rejected. Please contact support.")
+            reject_msg = (f"❌ 𝗣𝗮𝘆𝗺𝗲𝗻𝘁 𝗥𝗲𝗷𝗲𝗰𝘁𝗲𝗱\n\n"
+                          f"Unfortunately, your payment could not be verified or the submitted screenshot is invalid.\n\n"
+                          f"Please ensure that:\n"
+                          f"• The payment was completed successfully.\n"
+                          f"• The screenshot is clear and unedited.\n"
+                          f"• The transaction details are fully visible.\n"
+                          f"• The transaction ID is valid and matches the payment amount.\n\n"
+                          f"⚠️ Any attempt to submit fake, edited, reused, or fraudulent payment screenshots may result in your account being permanently restricted from using this bot.\n\n"
+                          f"🔄 Please review your payment details and submit a valid screenshot to continue.")
+            await context.bot.send_message(uid, reject_msg)
             await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
 
 def main():
     create_tables()
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).concurrent_updates(True).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
