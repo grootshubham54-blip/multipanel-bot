@@ -36,7 +36,6 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
-    # आपका ओरिजिनल वेलकम मैसेज
     welcome_text = (
         "🎮 Welcome to IOS SHUBHAM License Store\n\n"
         "Your trusted destination for premium gaming licenses.\n\n"
@@ -153,6 +152,7 @@ async def message_handler(update, context):
     elif text == "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
+        if g == "N/A": await update.message.reply_text("⚠️ Please select a game first using the menu."); return
         btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), 
                  InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{g}_{p}")]]
         await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
@@ -184,7 +184,8 @@ async def button_click(update, context):
             if key:
                 await context.bot.send_message(uid, f"🎉 *Payment Received!*\n\n📦 *Game:* {game}\n⏳ *Plan:* {plan}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
                 await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
-            else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
+            else: 
+                await query.edit_message_caption(caption=f"⚠️ Error: No keys available for {game} - {plan}!")
         elif action == "rej":
             await context.bot.send_message(uid, "❌ Payment Rejected. Please contact support.")
             await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
