@@ -1,12 +1,12 @@
 import os, logging
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from database import *
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
+# Logging को कम किया गया है ताकि बोट फास्ट रहे
+logging.basicConfig(level=logging.WARNING)
 
-# Railway Variables से टोकन उठा रहा है
+# Railway के 'BOT_TOKEN' वेरिएबल से टोकन उठा रहा है
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 7908981593 
 SUPPORT_USERNAME = "@IOS_HACK_S" 
@@ -79,6 +79,7 @@ async def message_handler(update, context):
         await start(update, context)
         return
 
+    # Admin Logic
     if user_id == ADMIN_ID:
         if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
@@ -139,15 +140,14 @@ async def button_click(update, context):
             await query.edit_message_caption(caption="⚠️ Stock Empty!")
 
 def main():
-    if not TOKEN:
-        print("Error: BOT_TOKEN not found in environment variables!")
-        return
+    if not TOKEN: return
     create_tables()
+    # यहाँ 'drop_pending_updates=True' बोट को फास्ट बनाता है
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True, timeout=30)
 
 if __name__ == "__main__":
     main()
