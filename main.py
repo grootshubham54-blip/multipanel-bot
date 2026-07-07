@@ -6,7 +6,6 @@ from database import *
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593 
-# यहाँ आपका सही यूजरनेम अपडेट कर दिया गया है:
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
@@ -170,9 +169,7 @@ async def button_click(update, context):
         elif action == "rej":
             reject_msg = (f"❌ *Payment Rejected*\n\n"
                           f"Unfortunately, your payment has been declined or the screenshot is invalid.\n"
-                          f"Please check your payment and try again.\n\n"
-                          f"🎮 *Game:* {game}\n⏳ *Plan:* {plan}\n\n"
-                          f"For support, contact: {SUPPORT_USERNAME}")
+                          f"Please check your payment and try again.")
             await context.bot.send_message(uid, reject_msg, parse_mode="Markdown")
             await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
 
