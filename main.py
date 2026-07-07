@@ -6,6 +6,7 @@ from database import *
 logging.basicConfig(level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593 
+# यहाँ आपका सही यूजरनेम अपडेट कर दिया गया है:
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
