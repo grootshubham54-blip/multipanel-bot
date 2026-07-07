@@ -1,4 +1,4 @@
-import os, logging, asyncio, uuid
+import os, logging, uuid
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from database import *
@@ -26,38 +26,9 @@ async def auto_cancel_order(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.edit_message_caption(chat_id=chat_id, message_id=message_id, caption="❌ Order Expired!")
     except: pass
 
-def admin_keyboard():
-    global is_bot_active
-    status = "ON" if is_bot_active else "OFF"
-    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📊 Sales Dashboard", "👥 Total Users"], ["📜 Key Report", "🔄 Resend Key"], ["📂 Export Data", "📢 Broadcast"], ["💾 Backup DB", "🗑 Delete Key"], [f"Maintenance: {status}"], ["🔙 Back"]], resize_keyboard=True)
-
-async def start(update, context):
-    global is_bot_active
-    if not is_bot_active and update.effective_user.id != ADMIN_ID: return
-    user = update.effective_user
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user.id, user.username or "N/A"))
-    conn.commit(); conn.close()
-    kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
-    if user.id == ADMIN_ID: kb.append(["⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦"])
-    await update.message.reply_text("Welcome to IOS SHUBHAM!", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
-
-async def message_handler(update, context):
-    global is_bot_active
-    text = update.message.text
-    user_id = update.effective_user.id
-    if not is_bot_active and user_id != ADMIN_ID: return
-    
-    # [यहाँ आपका पुराना एडमिन और अन्य मैसेज हैंडलिंग लॉजिक जस का तस रखें]
-    # (मैंने जगह बचाने के लिए इसे शॉर्ट रखा है, आप अपना पुराना हिस्सा यहाँ पेस्ट करें)
-    if text == "🔙 Back": await start(update, context)
-    elif text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
-        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
-        await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
-    # ... बाकी पुराने फीचर्स यहाँ पेस्ट करें ...
-
 async def button_click(update, context):
     query = update.callback_query; await query.answer()
+    
     if query.data.startswith("game_"):
         game = query.data.split("_")[1]; context.user_data["game"] = game
         kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}_{pr}_{game}")] for p, pr in GAME_PLANS[game].items()]
@@ -76,11 +47,25 @@ async def button_click(update, context):
         await query.message.reply_text("Please send screenshot for verification.")
     
     elif query.data == "cancel": await query.message.delete()
-    # [अपना पुराना acc_ और rej_ लॉजिक यहाँ जोड़ें]
+    
+    # अपना पुराना acc_ और rej_ वाला कोड यहाँ जोड़ लें
+    elif query.data.startswith(("acc_", "rej_")):
+        data = query.data.split("_"); action, uid, game, plan = data[0], int(data[1]), data[2], data[3]
+        if action == "acc":
+            key = approve_and_assign_key(uid, game, plan)
+            if key:
+                await context.bot.send_message(uid, f"🎉 *Payment Received!*\nKey: `{key}`", parse_mode="Markdown")
+                await query.edit_message_caption(caption=f"✅ Approved! User: {uid}")
+        elif action == "rej":
+            await context.bot.send_message(uid, "❌ Payment Rejected.")
+            await query.edit_message_caption(caption=f"❌ Rejected! User: {uid}")
 
 def main():
     create_tables()
-    app = Application.builder().token(TOKEN).job_queue(True).build() # यहाँ job_queue=True बहुत जरूरी है
+    # यहाँ बिना किसी एक्स्ट्रा आर्गुमेंट के build() का उपयोग करें
+    app = Application.builder().token(TOKEN).build()
+    
+    # बाकी हैंडलर्स
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
