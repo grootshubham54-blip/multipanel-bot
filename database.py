@@ -22,7 +22,6 @@ def save_key(game, key, plan):
 def approve_and_assign_key(user_id, game, plan):
     conn = get_conn()
     cur = conn.cursor()
-    # यहाँ .strip() का उपयोग किया गया है ताकि डेटाबेस मैच में गलती न हो
     cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game.strip(), plan.strip()))
     row = cur.fetchone()
     if row:
@@ -34,7 +33,6 @@ def approve_and_assign_key(user_id, game, plan):
     conn.close()
     return None
 
-# अन्य आवश्यक फंक्शन्स
 def get_all_users():
     conn = get_conn()
     cur = conn.cursor()
@@ -50,33 +48,3 @@ def get_stock_count(game, plan):
     count = cur.fetchone()[0]
     conn.close()
     return count
-
-def get_total_users():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users")
-    count = cur.fetchone()[0]
-    conn.close()
-    return count
-
-def get_sold_keys_count():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM keys WHERE used=1")
-    count = cur.fetchone()[0]
-    conn.close()
-    return count
-
-def get_user_keys(user_id):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=? AND used=1", (user_id,))
-    keys = cur.fetchall()
-    conn.close()
-    return keys
-
-def create_backup():
-    if not os.path.exists("backups"): os.makedirs("backups")
-    dest = f"backups/backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.db"
-    shutil.copy2("bot_database.db", dest)
-    return dest
