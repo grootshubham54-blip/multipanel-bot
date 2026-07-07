@@ -3,10 +3,8 @@ from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardBu
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from database import *
 
-# Logging को कम किया गया है ताकि बोट फास्ट रहे
-logging.disable(logging.CRITICAL)
-
-TOKEN = os.getenv("BOT_TOKEN")
+logging.basicConfig(level=logging.WARNING)
+TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593 
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
@@ -46,11 +44,24 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
+    # आपका पूरा पुराना वेलकम मैसेज वापस जोड़ दिया गया है
     welcome_text = (
         "🎮 Welcome to IOS SHUBHAM License Store\n\n"
         "Your trusted destination for premium gaming licenses.\n\n"
-        "📦 Available Products: KINGIOS, WINIOS, NEXT IOS, Mars Loader, DEADEYE, DOLPHIN IOS\n\n"
-        "🚀 Select an option from the menu below."
+        "━━━━━━━━━━━━━━\n\n"
+        "📦 Available Products\n"
+        "• KINGIOS\n• WINIOS\n• NEXT IOS\n• Mars Loader\n• DEADEYE\n• DOLPHIN IOS\n\n"
+        "⏳ License Durations\n"
+        "• 1 Day License\n• 7 Days License\n• 30 Days License\n\n"
+        "✨ Why Choose Us?\n"
+        "✅ Instant QR Code Generation\n"
+        "✅ Automatic Payment Verification\n"
+        "✅ Instant License Delivery\n"
+        "✅ Real-Time Order Tracking\n"
+        "✅ Fast & Reliable Support\n\n"
+        "━━━━━━━━━━━━━━\n\n"
+        "🚀 Select an option from the menu below to get started.\n\n"
+        "Thank you for choosing IOS SHUBHAM License Store."
     )
     
     kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝗼𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
@@ -63,12 +74,27 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
+    if not is_bot_active and user_id != ADMIN_ID: return
+
+    if user_id == ADMIN_ID and text.startswith("Maintenance:"):
+        is_bot_active = not is_bot_active
+        await update.message.reply_text(f"✅ बोट मेंटेनेंस मोड {'ON' if is_bot_active else 'OFF'}!", reply_markup=admin_keyboard())
+        return
+
+    if context.user_data.get("state") == "broadcasting":
+        users = get_all_users()
+        for u in users:
+            try: await context.bot.send_message(u, text)
+            except: pass
+        await update.message.reply_text("✅ Broadcast Sent!", reply_markup=admin_keyboard())
+        context.user_data.clear()
+        return
+
     if text == "🔙 Back":
         context.user_data.clear()
         await start(update, context)
         return
 
-    # Admin Panel & Features
     if user_id == ADMIN_ID:
         if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
@@ -83,6 +109,10 @@ async def message_handler(update, context):
             context.user_data["state"] = "select_plan"
             kb = [[p] for p in GAME_PLANS[text].keys()] + [["🔙 Back"]]
             await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+        elif context.user_data.get("state") == "select_plan":
+            context.user_data["add_plan"] = text
+            context.user_data["state"] = "add_keys"
+            await update.message.reply_text("Enter keys (one per line):")
         elif context.user_data.get("state") == "add_keys":
             for k in text.split("\n"):
                 if k.strip(): save_key(context.user_data["add_game"], k.strip(), context.user_data["add_plan"])
@@ -112,6 +142,9 @@ async def button_click(update, context):
         game = query.data.split("_")[1]; context.user_data["game"] = game
         kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
         await query.edit_message_text(f"🎮 {game}\nSelect plan:", reply_markup=InlineKeyboardMarkup(kb))
+    elif query.data.startswith("pay_"):
+        data = query.data.split("_"); game = context.user_data.get("game"); context.user_data["plan"] = data[1]
+        await query.message.reply_text(f"Pay ₹{data[2]} to {PAYMENT_DETAILS} and send screenshot here.")
     elif query.data.startswith("acc_"):
         data = query.data.split("_"); uid, game, plan = int(data[1]), data[2], data[3]
         key = approve_and_assign_key(uid, game, plan)
@@ -124,11 +157,11 @@ async def button_click(update, context):
 def main():
     if not TOKEN: return
     create_tables()
-    app = Application.builder().token(TOKEN).concurrent_updates(True).build()
+    app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
-    app.run_polling(drop_pending_updates=True, timeout=5)
+    app.run_polling(drop_pending_updates=True, timeout=30)
 
 if __name__ == "__main__":
     main()
