@@ -9,35 +9,26 @@ ADMIN_ID = 7908981593
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
-# Maintenance mode variable
-is_bot_active = True 
-
 GAME_PLANS = {
-    "👑 ✦ 𝕂𝕀ℕ𝔾 𝕚𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "⭐️ ✦ 𝕎𝕀ℕ𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
-    "🚀 ✦ ℕ𝔼𝕏𝕋 𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800"},
-    "🪐 ✦ 𝕄𝕒𝕣𝕤 𝕃𝕠𝕒𝕕𝕖𝕣 ✦": {"1 Day": "130", "1 Week": "599"},
-    "💀 ✦ 𝔻𝔼𝔸𝔻𝔼𝕐𝔼 ✦": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
-    "🐬 ✦ 𝔻𝕆𝕃ℙℍ𝕀ℕ 𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
+    "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
+    "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
+    "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
+    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "130", "1 Week": "599"},
+    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
+    "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
 }
 
 def admin_keyboard():
-    global is_bot_active
-    status = "ON" if is_bot_active else "OFF"
     return ReplyKeyboardMarkup([
         ["🔑 Add Keys", "📊 Stock"], 
         ["📊 Sales Dashboard", "👥 Total Users"], 
         ["📜 Key Report", "🔄 Resend Key"],
         ["📂 Export Data", "📢 Broadcast"],
         ["💾 Backup DB", "🗑 Delete Key"],
-        [f"Maintenance: {status}"],
         ["🔙 Back"]
     ], resize_keyboard=True)
 
 async def start(update, context):
-    global is_bot_active
-    if not is_bot_active and update.effective_user.id != ADMIN_ID: return
-    
     user = update.effective_user
     conn = get_conn()
     cur = conn.cursor()
@@ -45,30 +36,14 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
-    welcome_text = (
-        "🎮 Welcome to IOS SHUBHAM License Store\n\n"
-        "Your trusted destination for premium gaming licenses.\n\n"
-        "━━━━━━━━━━━━━━\n\n"
-        "🚀 Select an option from the menu below to get started."
-    )
-    
-    kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
-    if user.id == ADMIN_ID: kb.append(["⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦"])
-    await update.message.reply_text(welcome_text, reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+    kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
+    if user.id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
+    await update.message.reply_text("👋 Welcome!", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def message_handler(update, context):
-    global is_bot_active
     text = update.message.text
     user_id = update.effective_user.id
     
-    if not is_bot_active and user_id != ADMIN_ID: return
-
-    if user_id == ADMIN_ID and text.startswith("Maintenance:"):
-        is_bot_active = not is_bot_active
-        await update.message.reply_text(f"✅ Maintenance Mode is now {'ON' if is_bot_active else 'OFF'}!", reply_markup=admin_keyboard())
-        return
-
-    # Original features remain unchanged below
     if context.user_data.get("state") == "broadcasting":
         users = get_all_users()
         for u in users:
@@ -84,7 +59,7 @@ async def message_handler(update, context):
         return
 
     if user_id == ADMIN_ID:
-        if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
             context.user_data["state"] = "broadcasting"
             await update.message.reply_text("Send your Broadcast message:")
@@ -147,15 +122,15 @@ async def message_handler(update, context):
             sold = get_sold_keys_count()
             await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
 
-    if text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
+    if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
-    elif text == "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦":
+    elif text == "🔑 My Keys":
         keys = get_user_keys(user_id)
         if not keys: await update.message.reply_text("No keys found!")
         else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
-    elif text == "🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦": await update.message.reply_text(f"📞 Contact: {SUPPORT_USERNAME}")
-    elif text == "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
+    elif text == "📞 Support": await update.message.reply_text(f"📞 Contact: {SUPPORT_USERNAME}")
+    elif text == "💳 Payment": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
         btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), 
@@ -192,8 +167,10 @@ async def button_click(update, context):
                 await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
             else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
         elif action == "rej":
-            reject_msg = "❌ Payment Rejected. Please submit a valid payment screenshot."
-            await context.bot.send_message(uid, reject_msg)
+            reject_msg = (f"❌ *Payment Rejected*\n\n"
+                          f"Unfortunately, your payment has been declined or the screenshot is invalid.\n"
+                          f"Please check your payment and try again.")
+            await context.bot.send_message(uid, reject_msg, parse_mode="Markdown")
             await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
 
 def main():
