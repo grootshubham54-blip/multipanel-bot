@@ -1,4 +1,4 @@
-Import sqlite3
+import sqlite3
 
 def get_conn():
     return sqlite3.connect("bot_database.db", check_same_thread=False)
