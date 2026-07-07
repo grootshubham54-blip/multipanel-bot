@@ -37,6 +37,16 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
+    # Broadcast Logic
+    if context.user_data.get("state") == "broadcast":
+        users = get_all_users() # Assuming database.py has this function
+        for u in users:
+            try: await context.bot.send_message(u, text)
+            except: pass
+        await update.message.reply_text("✅ Broadcast Sent!", reply_markup=admin_keyboard())
+        context.user_data.clear()
+        return
+
     if text == "🔙 Back":
         context.user_data.clear()
         await start(update, context)
@@ -44,6 +54,9 @@ async def message_handler(update, context):
 
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        elif text == "📢 Broadcast":
+            context.user_data["state"] = "broadcast"
+            await update.message.reply_text("Send your Broadcast message:")
         elif text == "🔑 Add Keys":
             context.user_data["state"] = "select_game"
             kb = [[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]]
