@@ -133,7 +133,6 @@ async def message_handler(update, context):
     elif text == "💳 Payment": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
-        # यहाँ दो बटन हैं: Accept और Reject
         btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), 
                  InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{g}_{p}")]]
         await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
@@ -168,7 +167,12 @@ async def button_click(update, context):
                 await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
             else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
         elif action == "rej":
-            await context.bot.send_message(uid, f"❌ *Payment Rejected*\n\nदुर्भाग्यवश, आपका पेमेंट स्वीकार नहीं किया गया है। कृपया सही भुगतान करके पुनः प्रयास करें।\n\n🎮 *Game:* {game}\n⏳ *Plan:* {plan}", parse_mode="Markdown")
+            reject_msg = (f"❌ *Payment Rejected*\n\n"
+                          f"Unfortunately, your payment has been declined or the screenshot is invalid.\n"
+                          f"Please check your payment and try again.\n\n"
+                          f"🎮 *Game:* {game}\n⏳ *Plan:* {plan}\n\n"
+                          f"For support, contact: {SUPPORT_USERNAME}")
+            await context.bot.send_message(uid, reject_msg, parse_mode="Markdown")
             await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
 
 def main():
