@@ -12,10 +12,10 @@ PAYMENT_DETAILS = "UPI ID: yourname@upi"
 GAME_PLANS = {
     "👑 ✦ 𝕂𝕀ℕ𝔾 𝕚𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
     "⭐️ ✦ 𝕎𝕀ℕ𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
-    "🚀 ✦ ℕ𝔼𝕏𝕋 𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800"},
+    "🚀 ✦ ℕ𝔼𝕏𝕋 𝕚𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800"},
     "🪐 ✦ 𝕄𝕒𝕣𝕤 𝕃𝕠𝕒𝕕𝕖𝕣 ✦": {"1 Day": "130", "1 Week": "599"},
     "💀 ✦ 𝔻𝔼𝔸𝔻𝔼𝕐𝔼 ✦": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
-    "🐬 ✦ 𝔻𝕆𝕃ℙℍ𝕀ℕ 𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
+    "🐬 ✦ 𝔻𝕆𝕃ℙℍ𝕀ℕ 𝕚𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
 }
 
 def admin_keyboard():
@@ -31,34 +31,43 @@ async def start(update, context):
     cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user.id, user.username or "N/A"))
     conn.commit(); conn.close()
     
-    welcome_text = "🎮 Welcome to IOS SHUBHAM License Store\n\n🚀 Select an option from the menu below."
-    kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"], ["🔍 ✦ 𝕊𝕥𝕒𝕥𝕦𝕤 ℂ𝕙𝕖𝕔𝕜 ✦"]]
-    if user.id == ADMIN_ID: kb.append(["⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦"])
+    welcome_text = (
+        "🎮 Welcome to IOS SHUBHAM License Store\n\n"
+        "Your trusted destination for premium gaming licenses.\n\n"
+        "━━━━━━━━━━━━━━\n\n"
+        "📦 Available Products\n• KINGIOS\n• WINIOS\n• NEXT IOS\n• Mars Loader\n• DEADEYE\n• DOLPHIN IOS\n\n"
+        "⏳ License Durations\n• 1 Day | 7 Days | 30 Days\n\n"
+        "✨ Why Choose Us?\n✅ Instant QR | ✅ Auto Verification | ✅ Fast Delivery\n\n"
+        "━━━━━━━━━━━━━━\n\n"
+        "🚀 Select an option from the menu below to get started."
+    )
+    
+    kb = [["🎮 ✦ Games ✦", "🔑 ✦ My Keys ✦"], ["🎧 ✦ Support ✦", "💳 ✦ Top Up ✦"], ["🔍 ✦ Status Check ✦"]]
+    if user.id == ADMIN_ID: kb.append(["⚙️ ✦ Admin Panel ✦"])
     await update.message.reply_text(welcome_text, reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
-    # --- न्यू फीचर: सपोर्ट टिकट ---
+    # Support Ticket Logic
     if context.user_data.get("state") == "support_msg":
-        await context.bot.send_message(ADMIN_ID, f"📩 *नया सपोर्ट टिकट*\n👤 यूजर: @{update.effective_user.username or 'N/A'}\n🆔 आईडी: `{user_id}`\n\n💬 मैसेज: {text}", parse_mode="Markdown")
-        await update.message.reply_text("✅ आपका मैसेज एडमिन को भेज दिया गया है।")
+        await context.bot.send_message(ADMIN_ID, f"📩 *New Support Ticket*\n👤 User: @{update.effective_user.username or 'N/A'}\n🆔 ID: `{user_id}`\n\n💬 Message: {text}", parse_mode="Markdown")
+        await update.message.reply_text("✅ Your message has been sent to the admin.")
         context.user_data.clear(); return
 
-    # --- न्यू फीचर: स्टेटस चेक ---
-    if text == "🔍 ✦ 𝕊𝕥𝕒𝕥𝕦𝕤 ℂ𝕙𝕖𝕔𝕜 ✦":
-        await update.message.reply_text("⏳ आपकी पेमेंट अभी एडमिन द्वारा रिव्यू की जा रही है।")
+    if text == "🔍 ✦ Status Check ✦":
+        await update.message.reply_text("⏳ Your payment is being reviewed by the admin. Please wait.")
         return
 
-    # --- पुराने फीचर्स ---
     if text == "🔙 Back": context.user_data.clear(); await start(update, context); return
     
+    # Admin Logic
     if user_id == ADMIN_ID:
-        if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
+        if text == "⚙️ ✦ Admin Panel ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast": context.user_data["state"] = "broadcasting"; await update.message.reply_text("Send your Broadcast message:")
         elif text == "🔑 Add Keys": context.user_data["state"] = "select_game"; await update.message.reply_text("Select Game:", reply_markup=ReplyKeyboardMarkup([[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]], resize_keyboard=True))
-        elif context.user_data.get("state") == "select_game": 
+        elif context.user_data.get("state") == "select_game":
             context.user_data["add_game"] = text; context.user_data["state"] = "select_plan"
             await update.message.reply_text("Select Plan:", reply_markup=ReplyKeyboardMarkup([[p] for p in GAME_PLANS[text].keys()] + [["🔙 Back"]], resize_keyboard=True))
         elif context.user_data.get("state") == "select_plan":
@@ -68,25 +77,19 @@ async def message_handler(update, context):
             for k in text.split("\n"):
                 if k.strip(): save_key(context.user_data["add_game"], k.strip(), context.user_data["add_plan"])
             await update.message.reply_text("✅ Keys Saved!", reply_markup=admin_keyboard()); context.user_data.clear()
-        elif text == "📊 Stock":
-            msg = "📊 *Current Stock:*\n\n"
-            for g, plans in GAME_PLANS.items():
-                msg += f"*{g}:*\n"
-                for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
-            await update.message.reply_text(msg, parse_mode="Markdown")
-        elif text == "📊 Sales Dashboard": sold = get_sold_keys_count(); await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
 
-    if text == "🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦":
+    # User Logic
+    if text == "🎮 ✦ Games ✦":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
-    elif text == "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦":
+    elif text == "🔑 ✦ My Keys ✦":
         keys = get_user_keys(user_id)
         if not keys: await update.message.reply_text("No keys found!")
         else: await update.message.reply_text("\n".join([f"{g} ({p}): {k}" for g, p, k in keys]))
-    elif text == "🎧 ✦ 𝕊𝕦𝕡𝕡𝕠𝕣𝕥 ✦": 
+    elif text == "🎧 ✦ Support ✦": 
         context.user_data["state"] = "support_msg"
-        await update.message.reply_text("✍️ अपना मैसेज यहाँ लिखें:")
-    elif text == "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
+        await update.message.reply_text("✍️ Write your message here:")
+    elif text == "💳 ✦ Top Up ✦": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
         btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{g}_{p}")]]
@@ -105,7 +108,6 @@ async def button_click(update, context):
         await query.edit_message_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
     elif query.data.startswith("pay_"):
         data = query.data.split("_"); plan, price = data[1], data[2]; game = context.user_data.get("game", "Game")
-        context.user_data["plan"] = plan
         caption_text = f"✅ *Order Details*\n\n🎮 *Game:* {game}\n⏳ *Plan:* {plan}\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send screenshot."
         try:
             with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=caption_text, parse_mode="Markdown")
