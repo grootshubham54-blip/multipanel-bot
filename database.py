@@ -1,10 +1,8 @@
-import sqlite3
-import shutil
-import os
+import sqlite3, shutil, os
 from datetime import datetime
 
 def get_conn():
-    return sqlite3.connect("bot_database.db")
+    return sqlite3.connect("bot_database.db", check_same_thread=False)
 
 def create_tables():
     conn = get_conn()
@@ -14,47 +12,6 @@ def create_tables():
     conn.commit()
     conn.close()
 
-# यह रहा नया फंक्शन जो ब्रॉडकास्ट के लिए जरूरी है
-def get_all_users():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT user_id FROM users")
-    users = [row[0] for row in cur.fetchall()]
-    conn.close()
-    return users
-
-# बाकी सभी पुराने फंक्शन्स वैसे ही हैं, कोई छेड़छाड़ नहीं की गई है
-def get_all_keys_export():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT id, game, plan, key, used, user_id FROM keys")
-    data = cur.fetchall()
-    conn.close()
-    return data
-
-def get_key_by_user_id(user_id):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=? AND used=1", (user_id,))
-    data = cur.fetchall()
-    conn.close()
-    return data
-
-def delete_key_by_id(key_id):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM keys WHERE id=?", (key_id,))
-    conn.commit()
-    conn.close()
-
-def get_all_keys_report_with_id():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT id, game, plan, key, used, user_id FROM keys")
-    keys = cur.fetchall()
-    conn.close()
-    return keys
-
 def save_key(game, key, plan):
     conn = get_conn()
     cur = conn.cursor()
@@ -62,13 +19,29 @@ def save_key(game, key, plan):
     conn.commit()
     conn.close()
 
-def get_user_keys(user_id):
+def approve_and_assign_key(user_id, game, plan):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=? AND used=1", (user_id,))
-    keys = cur.fetchall()
+    # यहाँ .strip() का उपयोग किया गया है ताकि डेटाबेस मैच में गलती न हो
+    cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game.strip(), plan.strip()))
+    row = cur.fetchone()
+    if row:
+        kid, key = row
+        cur.execute("UPDATE keys SET used=1, user_id=? WHERE id=?", (user_id, kid))
+        conn.commit()
+        conn.close()
+        return key
     conn.close()
-    return keys
+    return None
+
+# अन्य आवश्यक फंक्शन्स
+def get_all_users():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM users")
+    users = [row[0] for row in cur.fetchall()]
+    conn.close()
+    return users
 
 def get_stock_count(game, plan):
     conn = get_conn()
@@ -94,30 +67,16 @@ def get_sold_keys_count():
     conn.close()
     return count
 
-def get_total_available_keys():
+def get_user_keys(user_id):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM keys WHERE used=0")
-    count = cur.fetchone()[0]
+    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=? AND used=1", (user_id,))
+    keys = cur.fetchall()
     conn.close()
-    return count
+    return keys
 
 def create_backup():
     if not os.path.exists("backups"): os.makedirs("backups")
     dest = f"backups/backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.db"
     shutil.copy2("bot_database.db", dest)
     return dest
-
-def approve_and_assign_key(user_id, game, plan):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game.strip(), plan.strip()))
-    row = cur.fetchone()
-    if row:
-        kid, key = row
-        cur.execute("UPDATE keys SET used=1, user_id=? WHERE id=?", (user_id, kid))
-        conn.commit()
-        conn.close()
-        return key
-    conn.close()
-    return None
