@@ -20,10 +20,17 @@ GAME_PLANS = {
     "🐬 ✦ 𝔻𝕆𝕃ℙℍ𝕀ℕ 𝕀𝕆𝕊 ✦": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
 }
 
+async def start(update, context):
+    user = update.effective_user
+    await update.message.reply_text("Welcome to IOS SHUBHAM Store! Use the menu below.")
+
+async def message_handler(update, context):
+    text = update.message.text
+    if text == "🔙 Back": await start(update, context)
+
 async def auto_cancel_order(context: ContextTypes.DEFAULT_TYPE):
     chat_id, message_id = context.job.data
-    try:
-        await context.bot.edit_message_caption(chat_id=chat_id, message_id=message_id, caption="❌ Order Expired!")
+    try: await context.bot.edit_message_caption(chat_id=chat_id, message_id=message_id, caption="❌ Order Expired!")
     except: pass
 
 async def button_click(update, context):
@@ -47,25 +54,11 @@ async def button_click(update, context):
         await query.message.reply_text("Please send screenshot for verification.")
     
     elif query.data == "cancel": await query.message.delete()
-    
-    # अपना पुराना acc_ और rej_ वाला कोड यहाँ जोड़ लें
-    elif query.data.startswith(("acc_", "rej_")):
-        data = query.data.split("_"); action, uid, game, plan = data[0], int(data[1]), data[2], data[3]
-        if action == "acc":
-            key = approve_and_assign_key(uid, game, plan)
-            if key:
-                await context.bot.send_message(uid, f"🎉 *Payment Received!*\nKey: `{key}`", parse_mode="Markdown")
-                await query.edit_message_caption(caption=f"✅ Approved! User: {uid}")
-        elif action == "rej":
-            await context.bot.send_message(uid, "❌ Payment Rejected.")
-            await query.edit_message_caption(caption=f"❌ Rejected! User: {uid}")
 
 def main():
     create_tables()
-    # यहाँ बिना किसी एक्स्ट्रा आर्गुमेंट के build() का उपयोग करें
     app = Application.builder().token(TOKEN).build()
     
-    # बाकी हैंडलर्स
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
     app.add_handler(CallbackQueryHandler(button_click))
