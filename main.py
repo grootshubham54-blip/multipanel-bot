@@ -3,11 +3,8 @@ from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardBu
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from database import *
 
-# Logging को कम किया गया है ताकि बोट फास्ट रहे
 logging.basicConfig(level=logging.WARNING)
-
-# Railway के 'BOT_TOKEN' वेरिएबल से टोकन उठा रहा है
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593 
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
@@ -47,7 +44,26 @@ async def start(update, context):
     conn.commit()
     conn.close()
     
-    welcome_text = "🎮 Welcome to IOS SHUBHAM License Store\n\n🚀 Select an option from the menu below to get started."
+    # आपका पूरा पुराना वेलकम मैसेज वापस जोड़ दिया गया है
+    welcome_text = (
+        "🎮 Welcome to IOS SHUBHAM License Store\n\n"
+        "Your trusted destination for premium gaming licenses.\n\n"
+        "━━━━━━━━━━━━━━\n\n"
+        "📦 Available Products\n"
+        "• KINGIOS\n• WINIOS\n• NEXT IOS\n• Mars Loader\n• DEADEYE\n• DOLPHIN IOS\n\n"
+        "⏳ License Durations\n"
+        "• 1 Day License\n• 7 Days License\n• 30 Days License\n\n"
+        "✨ Why Choose Us?\n"
+        "✅ Instant QR Code Generation\n"
+        "✅ Automatic Payment Verification\n"
+        "✅ Instant License Delivery\n"
+        "✅ Real-Time Order Tracking\n"
+        "✅ Fast & Reliable Support\n\n"
+        "━━━━━━━━━━━━━━\n\n"
+        "🚀 Select an option from the menu below to get started.\n\n"
+        "Thank you for choosing IOS SHUBHAM License Store."
+    )
+    
     kb = [["🎮 ✦ 𝔾𝕒𝕞𝕖𝕤 ✦", "🔑 ✦ 𝕄𝕪 𝕂𝕖𝕪𝕤 ✦"], ["🎧 ✦ 𝕊𝕦𝕡𝕡𝗼𝕣𝕥 ✦", "💳 ✦ 𝕋𝕠𝕡 𝕌𝕡 ✦"]]
     if user.id == ADMIN_ID: kb.append(["⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦"])
     await update.message.reply_text(welcome_text, reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
@@ -79,7 +95,6 @@ async def message_handler(update, context):
         await start(update, context)
         return
 
-    # Admin Logic
     if user_id == ADMIN_ID:
         if text == "⚙️ ✦ 𝔸𝕕𝕞𝕚𝕟 ℙ𝕒𝕟𝕖𝕝 ✦": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "📢 Broadcast":
@@ -142,7 +157,6 @@ async def button_click(update, context):
 def main():
     if not TOKEN: return
     create_tables()
-    # यहाँ 'drop_pending_updates=True' बोट को फास्ट बनाता है
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
