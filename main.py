@@ -30,7 +30,6 @@ def admin_keyboard():
 
 async def start(update, context):
     user = update.effective_user
-    # यूजर को डेटाबेस में सेव करने का लॉजिक
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user.id, user.username or "N/A"))
@@ -45,7 +44,6 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
-    # Broadcast Logic
     if context.user_data.get("state") == "broadcasting":
         users = get_all_users()
         for u in users:
@@ -135,7 +133,12 @@ async def message_handler(update, context):
     elif text == "💳 Payment": await update.message.reply_text(f"💳 Payment Details:\n{PAYMENT_DETAILS}")
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A"); p = context.user_data.get("plan", "N/A")
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}")]]))
+        # यहाँ दो बटन हैं: Accept और Reject
+        btns = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), 
+                 InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{g}_{p}")]]
+        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
+                                     caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", 
+                                     reply_markup=InlineKeyboardMarkup(btns))
         await update.message.reply_text("✅ Screenshot sent!")
 
 async def button_click(update, context):
@@ -153,14 +156,20 @@ async def button_click(update, context):
         try:
             with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 Pay to this QR and send screenshot.", parse_mode="Markdown")
         except: await query.message.reply_text("⚠️ QR file not found!")
-    elif query.data.startswith("acc_"):
-        data = query.data.split("_"); uid, game, plan = int(data[1]), data[2], data[3]
-        key = approve_and_assign_key(uid, game, plan)
-        if key:
-            success_msg = (f"🎉 *Payment Received Successfully!*\n\n━━━━━━━━━━━━━━━━━━\n📦 *Purchase Details:*\n🎮 *Game:* {game}\n⏳ *Plan:* {plan}\n━━━━━━━━━━━━━━━━━━\n\n🔑 *Your Access Key:*\n`{key}`\n\n━━━━━━━━━━━━━━━━━━\n🙏 *Thank you for your purchase!*\n🚀 Enjoy your access!")
-            await context.bot.send_message(uid, success_msg, parse_mode="Markdown")
-            await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
-        else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
+    
+    elif query.data.startswith(("acc_", "rej_")):
+        data = query.data.split("_")
+        action, uid, game, plan = data[0], int(data[1]), data[2], data[3]
+        if action == "acc":
+            key = approve_and_assign_key(uid, game, plan)
+            if key:
+                success_msg = (f"🎉 *Payment Received Successfully!*\n\n📦 *Game:* {game}\n⏳ *Plan:* {plan}\n🔑 *Key:* `{key}`")
+                await context.bot.send_message(uid, success_msg, parse_mode="Markdown")
+                await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
+            else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
+        elif action == "rej":
+            await context.bot.send_message(uid, f"❌ *Payment Rejected*\n\nदुर्भाग्यवश, आपका पेमेंट स्वीकार नहीं किया गया है। कृपया सही भुगतान करके पुनः प्रयास करें।\n\n🎮 *Game:* {game}\n⏳ *Plan:* {plan}", parse_mode="Markdown")
+            await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
 
 def main():
     create_tables()
