@@ -9,7 +9,6 @@ ADMIN_ID = 7908981593
 SUPPORT_USERNAME = "@IOS_HACK_S" 
 PAYMENT_DETAILS = "UPI ID: yourname@upi"
 
-# मेंटेनेंस मोड के लिए वेरिएबल
 is_bot_active = True 
 
 GAME_PLANS = {
@@ -99,8 +98,6 @@ async def message_handler(update, context):
         elif text == "📢 Broadcast":
             context.user_data["state"] = "broadcasting"
             await update.message.reply_text("Send your Broadcast message:")
-        elif text == "👥 Total Users":
-            await update.message.reply_text(f"👥 *Total Users:* {get_total_users()}", parse_mode="Markdown")
         elif text == "🔑 Add Keys":
             context.user_data["state"] = "select_game"
             kb = [[g] for g in GAME_PLANS.keys()] + [["🔙 Back"]]
@@ -126,34 +123,6 @@ async def message_handler(update, context):
                 msg += f"*{g}:*\n"
                 for p in plans: msg += f"  - {p}: {get_stock_count(g, p)} keys\n"
             await update.message.reply_text(msg, parse_mode="Markdown")
-        elif text == "💾 Backup DB":
-            path = create_backup()
-            await update.message.reply_text(f"✅ Backup saved at: {path}")
-        elif text == "📂 Export Data":
-            data = get_all_keys_export()
-            with open("keys.csv", "w") as f:
-                f.write("ID,Game,Plan,Key,Used,UserID\n")
-                for r in data: f.write(f"{','.join(map(str, r))}\n")
-            await update.message.reply_document(document=open("keys.csv", "rb"))
-        elif text == "🔄 Resend Key":
-            context.user_data["state"] = "resend_uid"
-            await update.message.reply_text("Enter Customer User ID:")
-        elif context.user_data.get("state") == "resend_uid":
-            try:
-                uid = int(text)
-                keys = get_key_by_user_id(uid)
-                if keys:
-                    msg = "\n".join([f"🎮 {g} ({p}): `{k}`" for g, p, k in keys])
-                    context.user_data["resend_msg"] = msg
-                    context.user_data["state"] = "confirm_resend"
-                    context.user_data["target_uid"] = uid
-                    await update.message.reply_text(f"Found:\n{msg}\n\nConfirm to resend?", reply_markup=ReplyKeyboardMarkup([["✅ Confirm Resend", "🔙 Back"]], resize_keyboard=True))
-                else: await update.message.reply_text("⚠️ No keys found."); context.user_data.clear()
-            except: await update.message.reply_text("⚠️ Invalid ID."); context.user_data.clear()
-        elif context.user_data.get("state") == "confirm_resend" and text == "✅ Confirm Resend":
-            await context.bot.send_message(context.user_data["target_uid"], f"🔄 *Your key has been resent:*\n\n{context.user_data['resend_msg']}", parse_mode="Markdown")
-            await update.message.reply_text("✅ Sent successfully!", reply_markup=admin_keyboard())
-            context.user_data.clear()
         elif text == "📊 Sales Dashboard":
             sold = get_sold_keys_count()
             await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
@@ -204,7 +173,15 @@ async def button_click(update, context):
                 await query.edit_message_caption(caption=f"✅ Approved!\nUser ID: {uid}\nKey: {key}")
             else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
         elif action == "rej":
-            reject_msg = ("❌ 𝗣𝗮𝘆𝗺𝗲𝗻𝘁 𝗥𝗲𝗷𝗲𝗰𝘁𝗲𝗱\n\nUnfortunately, your payment could not be verified.")
+            reject_msg = (f"❌ 𝗣𝗮𝘆𝗺𝗲𝗻𝘁 𝗥𝗲𝗷𝗲𝗰𝘁𝗲𝗱\n\n"
+                          f"Unfortunately, your payment could not be verified or the submitted screenshot is invalid.\n\n"
+                          f"Please ensure that:\n"
+                          f"• The payment was completed successfully.\n"
+                          f"• The screenshot is clear and unedited.\n"
+                          f"• The transaction details are fully visible.\n"
+                          f"• The transaction ID is valid and matches the payment amount.\n\n"
+                          f"⚠️ Any attempt to submit fake, edited, reused, or fraudulent payment screenshots may result in your account being permanently restricted from using this bot.\n\n"
+                          f"🔄 Please review your payment details and submit a valid screenshot to continue.")
             await context.bot.send_message(uid, reject_msg)
             await query.edit_message_caption(caption=f"❌ Rejected!\nUser ID: {uid}")
 
