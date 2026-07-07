@@ -99,7 +99,6 @@ async def message_handler(update, context):
             await update.message.reply_text(f"📊 *Sales Dashboard*\n\n✅ Sold: {sold}\n💰 Revenue: ₹{sold * 200}", parse_mode="Markdown")
         elif text == "🔙 Back": context.user_data.clear(); await start(update, context); return
 
-    # User Section
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
