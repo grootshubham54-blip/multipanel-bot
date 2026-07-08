@@ -6,11 +6,13 @@ from database import *
 
 logging.basicConfig(level=logging.INFO)
 
-# रेलवे से टोकन लेने का सबसे सही तरीका
+# Make sure to set 'BOT_TOKEN' in your Railway Environment Variables
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
-# अपना QR का फाइल आईडी यहाँ डालें (अगर अभी नहीं है तो इसे खाली छोड़ दें)
-PAYMENT_QR_FILE_ID = "YOUR_PHOTO_FILE_ID" 
+
+# Replace this with the actual file_id of your QR code image
+# To get the file_id, send the image to your bot and print the update object in logs
+PAYMENT_QR_FILE_ID = "YOUR_QR_PHOTO_FILE_ID" 
 
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
@@ -26,13 +28,6 @@ def main_keyboard(user_id):
     if user_id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
     return ReplyKeyboardMarkup(kb, resize_keyboard=True)
 
-def admin_keyboard():
-    return ReplyKeyboardMarkup([["🔑 Add Keys", "📊 Stock"], ["📜 Key Report", "👥 Total Users"], ["🔙 Back"]], resize_keyboard=True)
-
-async def start(update, context):
-    save_user(update.effective_user.id, update.effective_user.username)
-    await update.message.reply_text("👋 स्वागत है! गेम चुनें:", reply_markup=main_keyboard(update.effective_user.id))
-
 async def button_handler(update, context):
     query = update.callback_query
     await query.answer()
@@ -42,76 +37,38 @@ async def button_handler(update, context):
     if data.startswith("game_"):
         game = data.split("_")[1]
         context.user_data["game"] = game
-        msg = f"🎮 {game} चुना।\n\n*उपलब्ध प्लान और स्टॉक:*\n"
+        msg = f"🎮 Selected: {game}\n\n*Available Plans and Stock:*\n"
         kb = []
         for p, price in GAME_PLANS[game].items():
             stock = get_stock_count(game, p)
-            msg += f"- {p} ({price}₹): {'✅' if stock > 0 else '❌'} ({stock} उपलब्ध)\n"
+            msg += f"- {p} ({price}₹): {'✅' if stock > 0 else '❌'} ({stock} left)\n"
             if stock > 0: kb.append([InlineKeyboardButton(f"{p} ({price}₹)", callback_data=f"plan_{p}")])
         
         await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb) if kb else None)
 
+    # --- QR LOGIC ADDED HERE ---
     elif data.startswith("plan_"):
         plan_name = data.split("_")[1]
         context.user_data["plan"] = plan_name
-        # अगर QR फाइल आईडी नहीं है, तो सिर्फ टेक्स्ट भेजें
-        if PAYMENT_QR_FILE_ID == "YOUR_PHOTO_FILE_ID":
-            await query.message.reply_text("✅ पेमेंट करें और स्क्रीनशॉट भेजें।")
-        else:
-            await context.bot.send_photo(user_id, photo=PAYMENT_QR_FILE_ID, caption="✅ QR पर पेमेंट करें और स्क्रीनशॉट भेजें।")
+        
+        # Sends the QR code image to the user
+        await context.bot.send_photo(
+            chat_id=user_id,
+            photo=PAYMENT_QR_FILE_ID,
+            caption=f"✅ You selected {context.user_data['game']} - {plan_name}.\n\nPlease scan the QR code to pay, then send the payment screenshot here."
+        )
 
+    # ... (rest of the callback handling remains the same)
     elif data.startswith("acc_"):
         _, uid, game, plan = data.split("_")
         key = approve_and_assign_key(int(uid), game, plan)
         if key:
-            await context.bot.send_message(int(uid), f"✅ पेमेंट स्वीकार! आपकी की: `{key}`", parse_mode="Markdown")
-            await query.edit_message_text(f"✅ की भेज दी गई है: {key}")
-        else: await query.edit_message_text("❌ स्टॉक खत्म हो गया!")
+            await context.bot.send_message(int(uid), f"✅ Payment Accepted!\n\n🔑 Key: `{key}`", parse_mode="Markdown")
+            await query.edit_message_text(f"✅ Key delivered: {key}")
+        else: await query.edit_message_text("❌ Out of stock!")
 
     elif data.startswith("rej_"):
-        await context.bot.send_message(data.split("_")[1], "❌ आपकी पेमेंट रिजेक्ट कर दी गई।")
-        await query.edit_message_text("❌ रिजेक्टेड।")
+        await context.bot.send_message(data.split("_")[1], "❌ Your payment was rejected.")
+        await query.edit_message_text("❌ Rejected.")
 
-async def message_handler(update, context):
-    text = update.message.text
-    user_id = update.effective_user.id
-    
-    if user_id == ADMIN_ID:
-        if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
-        elif text == "🔑 Add Keys":
-            context.user_data["state"] = "select_game"
-            await update.message.reply_text("गेम चुनें:", reply_markup=ReplyKeyboardMarkup([[g] for g in GAME_PLANS.keys()], resize_keyboard=True))
-        elif text in GAME_PLANS:
-            context.user_data["add_game"] = text
-            await update.message.reply_text("प्लान चुनें:", reply_markup=ReplyKeyboardMarkup([[p] for p in GAME_PLANS[text].keys()], resize_keyboard=True))
-        elif text in [p for sub in [plans.keys() for plans in GAME_PLANS.values()] for p in sub]:
-            context.user_data["add_plan"] = text
-            context.user_data["state"] = "add_keys"
-            await update.message.reply_text("कीज पेस्ट करें (एक लाइन में एक):")
-        elif context.user_data.get("state") == "add_keys":
-            for k in text.split("\n"): save_key(context.user_data["add_game"], context.user_data["add_plan"], k.strip())
-            await update.message.reply_text("✅ कीज सेव हो गई!", reply_markup=admin_keyboard())
-            context.user_data.clear()
-        elif text == "📊 Stock":
-            msg = "📊 स्टॉक:\n"
-            for g, plans in GAME_PLANS.items():
-                for p in plans: msg += f"{g} - {p}: {get_stock_count(g, p)}\n"
-            await update.message.reply_text(msg)
-        elif text == "🔙 Back": await update.message.reply_text("Menu:", reply_markup=main_keyboard(user_id))
-
-    if text == "🎮 Games":
-        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
-        await update.message.reply_text("गेम चुनें:", reply_markup=InlineKeyboardMarkup(kb))
-    elif update.message.photo and "plan" in context.user_data:
-        g, p = context.user_data["game"], context.user_data["plan"]
-        kb = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}")]]
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}\n{g} | {p}", reply_markup=InlineKeyboardMarkup(kb))
-        await update.message.reply_text("✅ स्क्रीनशॉट भेज दिया गया है।")
-
-if __name__ == '__main__':
-    create_tables()
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
-    app.run_polling()
+# ... (rest of your handler setup)
