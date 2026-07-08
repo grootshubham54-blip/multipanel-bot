@@ -33,6 +33,7 @@ def get_user_keys(uid):
 
 def approve_and_assign_key(uid, game, plan):
     conn = get_conn(); cur = conn.cursor()
+    # Corrected function to match the main.py logic
     cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game, plan))
     row = cur.fetchone()
     if row:
