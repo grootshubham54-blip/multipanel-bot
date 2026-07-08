@@ -6,10 +6,10 @@ from database import *
 
 logging.basicConfig(level=logging.INFO)
 
-# Make sure 'BOT_TOKEN' is set in your Railway variables
 TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
-PAYMENT_QR_FILE_ID = "YOUR_QR_PHOTO_FILE_ID" # Replace with your actual file_id
+# Replace with your actual QR file_id
+PAYMENT_QR_FILE_ID = "YOUR_QR_PHOTO_FILE_ID" 
 
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
@@ -63,8 +63,11 @@ async def message_handler(update, context):
 
 if __name__ == '__main__':
     create_tables()
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
-    app.run_polling()
+    if not TOKEN:
+        print("Error: BOT_TOKEN not found in environment!")
+    else:
+        app = Application.builder().token(TOKEN).build()
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CallbackQueryHandler(button_handler))
+        app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
+        app.run_polling()
