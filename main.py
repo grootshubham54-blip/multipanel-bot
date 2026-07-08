@@ -66,6 +66,7 @@ async def message_handler(update, context):
             await start(update, context)
             return
 
+    # User Logic
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -76,7 +77,6 @@ async def message_handler(update, context):
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A")
         p = context.user_data.get("plan", "N/A")
-        # यहाँ बटन में गेम और प्लान का नाम भेज रहे हैं
         await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
                                      caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", 
                                      reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}")]]))
