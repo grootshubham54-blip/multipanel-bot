@@ -9,11 +9,7 @@ ADMIN_ID = 7908981593
 
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
-    "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
-    "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
-    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "130", "1 Week": "599"},
-    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
-    "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
+    "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"}
 }
 
 async def start(update, context):
@@ -21,7 +17,7 @@ async def start(update, context):
     save_user(u.id, u.username)
     kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
     if u.id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
-    await update.message.reply_text("👋 Welcome to Store!", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+    await update.message.reply_text("👋 Welcome!", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def message_handler(update, context):
     txt, uid = update.message.text, update.effective_user.id
@@ -35,10 +31,9 @@ async def message_handler(update, context):
         elif txt == "📜 Key Report":
             report = "📜 *Report:*\n" + "".join([f"🎮 {g}|{p} | {'✅' if u==1 else '🟢'} {k}\n" for g,p,k,u,id in get_all_keys_report()])
             await update.message.reply_text(report, parse_mode="Markdown")
-        elif txt == "👥 Total Users": await update.message.reply_text(f"Total: {get_total_users()}")
-        elif txt == "🔑 Add Keys": 
+        elif txt == "🔑 Add Keys":
             context.user_data["state"] = "wait_keys"
-            await update.message.reply_text("Format: GameName | Plan | Key (one per line)")
+            await update.message.reply_text("Format: GameName|Plan|Key (one per line)")
         elif context.user_data.get("state") == "wait_keys":
             for line in txt.split("\n"):
                 if "|" in line:
@@ -51,30 +46,29 @@ async def message_handler(update, context):
     if txt == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select:", reply_markup=InlineKeyboardMarkup(kb))
-    elif txt == "🔑 My Keys":
-        k = get_user_keys(uid)
-        await update.message.reply_text("\n".join([f"{g}({p}): {k}" for g,p,k in k]) if k else "No keys!")
+    elif txt == "💳 Payment":
+        if os.path.exists("qr.JPG"): await update.message.reply_photo(photo=open("qr.JPG", "rb"), caption="👉 Pay to this QR and send the screenshot.")
     elif update.message.photo and uid != ADMIN_ID:
         g, p = context.user_data.get("g", "N/A"), context.user_data.get("p", "N/A")
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Pay by {uid}\nGame: {g}\nPlan: {p}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Acc", callback_data=f"acc_{uid}_{g}_{p}"), InlineKeyboardButton("❌ Rej", callback_data=f"rej_{uid}_{g}_{p}")]]))
-        await update.message.reply_text("✅ Sent!")
+        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Pay by {uid}\nGame: {g}\nPlan: {p}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{uid}_{g}_{p}"), InlineKeyboardButton("❌ Reject", callback_data=f"rej_{uid}_{g}_{p}")]]))
+        await update.message.reply_text("✅ Screenshot sent!")
 
 async def button_click(update, context):
     q = update.callback_query; await q.answer()
     d = q.data.split("_")
     if d[0] == "game":
         context.user_data["g"] = d[1]
-        kb = [[InlineKeyboardButton(f"{p} - {pr}", callback_data=f"pay_{p}_{d[1]}")] for p, pr in GAME_PLANS[d[1]].items()]
+        kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}")] for p, pr in GAME_PLANS[d[1]].items()]
         await q.message.reply_text("Select Plan:", reply_markup=InlineKeyboardMarkup(kb))
     elif d[0] == "pay":
         context.user_data["p"] = d[1]
-        await q.message.reply_text("Send screenshot now.")
+        await q.message.reply_text("✅ Plan selected. Now send your payment screenshot.")
     elif d[0] in ["acc", "rej"]:
         uid, g, p = int(d[1]), d[2], d[3]
         if d[0] == "acc":
             key = approve_and_assign_key(uid, g, p)
-            if key: await context.bot.send_message(uid, f"✅ Key: `{key}`", parse_mode="Markdown"); await q.edit_message_caption("✅ Approved!")
-        else: await context.bot.send_message(uid, "❌ Payment Rejected! Send clear screenshot."); await q.edit_message_caption("❌ Rejected!")
+            if key: await context.bot.send_message(uid, f"✅ *Payment Approved!*\n🔑 *Key:* `{key}`", parse_mode="Markdown"); await q.edit_message_caption("✅ Approved!")
+        else: await context.bot.send_message(uid, "❌ Payment Rejected! Please send a clear screenshot."); await q.edit_message_caption("❌ Rejected!")
 
 if __name__ == "__main__":
     create_tables()
