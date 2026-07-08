@@ -1,47 +1,70 @@
-import sqlite3
+import os
+import logging
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from database import *
 
-def get_conn(): return sqlite3.connect("bot_data.db", check_same_thread=False)
+logging.basicConfig(level=logging.INFO)
 
-def create_tables():
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, username TEXT)")
-    cur.execute("CREATE TABLE IF NOT EXISTS keys (id INTEGER PRIMARY KEY, game TEXT, plan TEXT, key TEXT, used INTEGER DEFAULT 0, user_id INTEGER)")
-    conn.commit(); conn.close()
+# Make sure 'BOT_TOKEN' is set in your Railway variables
+TOKEN = os.getenv("BOT_TOKEN") 
+ADMIN_ID = 7908981593
+PAYMENT_QR_FILE_ID = "YOUR_QR_PHOTO_FILE_ID" # Replace with your actual file_id
 
-def save_key(game, plan, key):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("INSERT INTO keys (game, plan, key) VALUES (?, ?, ?)", (game, plan, key))
-    conn.commit(); conn.close()
+GAME_PLANS = {
+    "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
+    "WINIOS": {"1 Day": "200", "1 Week": "600", "1 Month": "1399"},
+    "NEXT IOS": {"1 Day": "200", "1 Week": "800"},
+    "𝐌𝐚𝐫𝐬 𝐋𝐨𝐚𝐝𝐞𝐫": {"1 Day": "130", "1 Week": "599"},
+    "𝘿𝙀𝘼𝘿𝙀𝙀𝙀𝙀𝙔𝙀": {"1 Day": "200", "1 Week": "600", "1 Month": "1600"},
+    "DOLPHIN IOS": {"1 Day": "200", "1 Week": "800", "1 Month": "1499"}
+}
 
-def get_stock_count(game, plan):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM keys WHERE game=? AND plan=? AND used=0", (game, plan))
-    count = cur.fetchone()[0]; conn.close(); return count
+async def start(update, context):
+    save_user(update.effective_user.id, update.effective_user.username)
+    kb = [["🎮 Games", "🔑 My Keys"], ["📞 Support", "💳 Payment"]]
+    if update.effective_user.id == ADMIN_ID: kb.append(["🛠 Admin Panel"])
+    await update.message.reply_text("👋 Welcome! Select an option:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
-def get_total_users():
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users"); count = cur.fetchone()[0]; conn.close(); return count
+async def button_handler(update, context):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    
+    if data.startswith("game_"):
+        game = data.split("_")[1]
+        context.user_data["game"] = game
+        msg = f"🎮 Selected: {game}\n\n*Available Plans:*\n"
+        kb = []
+        for p, price in GAME_PLANS[game].items():
+            stock = get_stock_count(game, p)
+            msg += f"- {p} ({price}₹): {stock} available\n"
+            if stock > 0: kb.append([InlineKeyboardButton(f"{p} ({price}₹)", callback_data=f"plan_{p}")])
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb))
 
-def get_all_keys_report():
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT game, plan, key, used, user_id FROM keys")
-    rows = cur.fetchall(); conn.close(); return rows
+    elif data.startswith("plan_"):
+        plan = data.split("_")[1]
+        context.user_data["plan"] = plan
+        await context.bot.send_photo(chat_id=query.from_user.id, photo=PAYMENT_QR_FILE_ID, caption=f"Pay for {plan} and send screenshot.")
 
-def get_user_keys(uid):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT game, plan, key FROM keys WHERE user_id=?", (uid,)); rows = cur.fetchall(); conn.close(); return rows
+async def message_handler(update, context):
+    text = update.message.text
+    user_id = update.effective_user.id
+    
+    if text == "🎮 Games":
+        kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
+        await update.message.reply_text("Choose a game:", reply_markup=InlineKeyboardMarkup(kb))
+    
+    elif update.message.photo and "game" in context.user_data:
+        g, p = context.user_data["game"], context.user_data["plan"]
+        kb = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"), InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}")]]
+        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", reply_markup=InlineKeyboardMarkup(kb))
+        await update.message.reply_text("✅ Screenshot sent to Admin!")
 
-def approve_and_assign_key(uid, game, plan):
-    conn = get_conn(); cur = conn.cursor()
-    # Corrected function to match the main.py logic
-    cur.execute("SELECT id, key FROM keys WHERE game=? AND plan=? AND used=0 LIMIT 1", (game, plan))
-    row = cur.fetchone()
-    if row:
-        cur.execute("UPDATE keys SET used=1, user_id=? WHERE id=?", (uid, row[0]))
-        conn.commit(); conn.close(); return row[1]
-    conn.close(); return None
-
-def save_user(uid, uname):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (uid, uname))
-    conn.commit(); conn.close()
+if __name__ == '__main__':
+    create_tables()
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
+    app.run_polling()
