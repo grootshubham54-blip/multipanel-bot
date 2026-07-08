@@ -1,7 +1,7 @@
 import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from database import create_tables, save_key, approve_and_assign_key, get_user_keys, get_stock_count, get_total_users, get_all_keys_report
 
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +30,7 @@ async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
+    # Admin Logic
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "👥 Total Users": await update.message.reply_text(f"👥 Total users: {get_total_users()}")
@@ -66,6 +67,7 @@ async def message_handler(update, context):
             await start(update, context)
             return
 
+    # User Logic
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -76,34 +78,43 @@ async def message_handler(update, context):
     elif update.message.photo and user_id != ADMIN_ID:
         g = context.user_data.get("game", "N/A")
         p = context.user_data.get("plan", "N/A")
-        # यहाँ बटन में गेम और प्लान का नाम भेज रहे हैं
-        await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
-                                     caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", 
-                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}")]]))
-        await update.message.reply_text("✅ Screenshot sent!")
+        kb = [[InlineKeyboardButton("✅ Accept", callback_data=f"acc_{user_id}_{g}_{p}"),
+               InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}")]]
+        try:
+            await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, 
+                                         caption=f"Payment from {user_id}\nGame: {g}\nPlan: {p}", 
+                                         reply_markup=InlineKeyboardMarkup(kb))
+            await update.message.reply_text("✅ Screenshot sent to Admin!")
+        except: await update.message.reply_text("⚠️ Error sending screenshot.")
 
 async def button_click(update, context):
     query = update.callback_query
     await query.answer()
+    
     if query.data.startswith("game_"):
-        game = query.data.split("_")[1]
+        game = query.data.split("_", 1)[1]
         context.user_data["game"] = game
         kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
         await query.message.reply_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+    
     elif query.data.startswith("pay_"):
-        data = query.data.split("_")
-        plan, price, game = data[1], data[2], context.user_data.get("game")
+        _, plan, price = query.data.split("_")
         context.user_data["plan"] = plan
-        invoice_msg = f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 *Pay to this QR and send the screenshot here.*"
-        with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=invoice_msg, parse_mode="Markdown")
+        with open("qr.JPG", "rb") as qr: 
+            await query.message.reply_photo(photo=qr, caption=f"Pay ₹{price} and send screenshot.")
+            
     elif query.data.startswith("acc_"):
-        data = query.data.split("_")
-        uid, game, plan = int(data[1]), data[2], data[3]
-        key = approve_and_assign_key(uid, game, plan)
+        _, uid, game, plan = query.data.split("_", 3)
+        key = approve_and_assign_key(int(uid), game, plan)
         if key:
-            await context.bot.send_message(uid, f"✅ *Payment Approved!*\n\n🎮 {game}\n🔑 *Key:* `{key}`", parse_mode="Markdown")
-            await query.edit_message_caption(caption=f"✅ Approved! Key: {key}")
-        else: await query.edit_message_caption(caption="⚠️ Error: No keys available for this selection!")
+            await context.bot.send_message(uid, f"✅ *Payment Approved!*\n🔑 *Key:* `{key}`", parse_mode="Markdown")
+            await query.edit_message_caption(caption=f"✅ Approved for {uid}\nKey: {key}")
+        else: await query.edit_message_caption(caption="⚠️ Error: No keys available!")
+
+    elif query.data.startswith("rej_"):
+        _, uid = query.data.split("_")
+        await context.bot.send_message(uid, "❌ *Payment Rejected!*\nPlease contact support.", parse_mode="Markdown")
+        await query.edit_message_caption(caption=f"❌ Payment Rejected for user {uid}")
 
 def main():
     create_tables()
@@ -114,4 +125,4 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-    main() इस कोडिंग में पेमेंट रिजेक्ट करने का भी फीचर ऐड कर दो।
+    main()
