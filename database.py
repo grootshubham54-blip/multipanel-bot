@@ -15,7 +15,6 @@ def create_tables():
     conn.commit()
     conn.close()
 
-# नया फ़ंक्शन जो आपके main.py के लिए ज़रूरी है
 def get_all_keys_report():
     conn = get_conn()
     cur = conn.cursor()
@@ -39,7 +38,7 @@ def get_total_users():
     conn.close()
     return count
 
-def save_key(game, key, plan): # नोट: main.py के कॉल के अनुसार पैरामीटर क्रम
+def save_key(game, key, plan):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("INSERT INTO keys (game, key, plan) VALUES (?, ?, ?)", (game, key, plan))
