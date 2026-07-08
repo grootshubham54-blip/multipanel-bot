@@ -66,7 +66,6 @@ async def message_handler(update, context):
             await start(update, context)
             return
 
-    # User Logic
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("Select Game:", reply_markup=InlineKeyboardMarkup(kb))
@@ -88,11 +87,18 @@ async def button_click(update, context):
     if query.data.startswith("game_"):
         game = query.data.split("_")[1]
         context.user_data["game"] = game
-        kb = [[InlineKeyboardButton(f"{p} - ₹{pr}", callback_data=f"pay_{p}_{pr}")] for p, pr in GAME_PLANS[game].items()]
+        kb = []
+        for p, pr in GAME_PLANS[game].items():
+            stock = get_stock_count(game, p)
+            btn_text = f"{p} - ₹{pr} ({stock} Available)"
+            kb.append([InlineKeyboardButton(btn_text, callback_data=f"pay_{p}_{pr}")])
         await query.message.reply_text(f"🎮 *{game}*\nSelect your plan:", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
     elif query.data.startswith("pay_"):
         data = query.data.split("_")
         plan, price, game = data[1], data[2], context.user_data.get("game")
+        if get_stock_count(game, plan) <= 0:
+            await query.message.reply_text("⚠️ Sorry, this plan is currently out of stock!")
+            return
         context.user_data["plan"] = plan
         invoice_msg = f"✅ *Plan:* {game} ({plan})\n💰 *Amount:* ₹{price}\n\n👉 *Pay to this QR and send the screenshot here.*"
         with open("qr.JPG", "rb") as qr: await query.message.reply_photo(photo=qr, caption=invoice_msg, parse_mode="Markdown")
