@@ -5,9 +5,12 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from database import *
 
 logging.basicConfig(level=logging.INFO)
-TOKEN = "YOUR_BOT_TOKEN_HERE" # यहाँ अपना टोकन डालें
+
+# रेलवे से टोकन लेने का सबसे सही तरीका
+TOKEN = os.getenv("BOT_TOKEN") 
 ADMIN_ID = 7908981593
-PAYMENT_QR_FILE_ID = "YOUR_PHOTO_FILE_ID" # अपने QR की फाइल आईडी डालें
+# अपना QR का फाइल आईडी यहाँ डालें (अगर अभी नहीं है तो इसे खाली छोड़ दें)
+PAYMENT_QR_FILE_ID = "YOUR_PHOTO_FILE_ID" 
 
 GAME_PLANS = {
     "👑 KING iOS": {"1 Day": "200", "1 Week": "800", "1 Month": "2000"},
@@ -49,8 +52,13 @@ async def button_handler(update, context):
         await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb) if kb else None)
 
     elif data.startswith("plan_"):
-        context.user_data["plan"] = data.split("_")[1]
-        await context.bot.send_photo(user_id, photo=PAYMENT_QR_FILE_ID, caption="✅ QR पर पेमेंट करें और स्क्रीनशॉट भेजें।")
+        plan_name = data.split("_")[1]
+        context.user_data["plan"] = plan_name
+        # अगर QR फाइल आईडी नहीं है, तो सिर्फ टेक्स्ट भेजें
+        if PAYMENT_QR_FILE_ID == "YOUR_PHOTO_FILE_ID":
+            await query.message.reply_text("✅ पेमेंट करें और स्क्रीनशॉट भेजें।")
+        else:
+            await context.bot.send_photo(user_id, photo=PAYMENT_QR_FILE_ID, caption="✅ QR पर पेमेंट करें और स्क्रीनशॉट भेजें।")
 
     elif data.startswith("acc_"):
         _, uid, game, plan = data.split("_")
@@ -61,14 +69,13 @@ async def button_handler(update, context):
         else: await query.edit_message_text("❌ स्टॉक खत्म हो गया!")
 
     elif data.startswith("rej_"):
-        await context.bot.send_message(data.split("_")[1], "❌ पेमेंट रिजेक्ट कर दी गई।")
+        await context.bot.send_message(data.split("_")[1], "❌ आपकी पेमेंट रिजेक्ट कर दी गई।")
         await query.edit_message_text("❌ रिजेक्टेड।")
 
 async def message_handler(update, context):
     text = update.message.text
     user_id = update.effective_user.id
     
-    # एडमिन लॉजिक (सा संक्षिप्त किया है)
     if user_id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("Admin Panel:", reply_markup=admin_keyboard())
         elif text == "🔑 Add Keys":
@@ -81,19 +88,17 @@ async def message_handler(update, context):
             context.user_data["add_plan"] = text
             context.user_data["state"] = "add_keys"
             await update.message.reply_text("कीज पेस्ट करें (एक लाइन में एक):")
-            return
         elif context.user_data.get("state") == "add_keys":
             for k in text.split("\n"): save_key(context.user_data["add_game"], context.user_data["add_plan"], k.strip())
             await update.message.reply_text("✅ कीज सेव हो गई!", reply_markup=admin_keyboard())
             context.user_data.clear()
-            return
         elif text == "📊 Stock":
             msg = "📊 स्टॉक:\n"
             for g, plans in GAME_PLANS.items():
                 for p in plans: msg += f"{g} - {p}: {get_stock_count(g, p)}\n"
             await update.message.reply_text(msg)
+        elif text == "🔙 Back": await update.message.reply_text("Menu:", reply_markup=main_keyboard(user_id))
 
-    # यूजर लॉजिक
     if text == "🎮 Games":
         kb = [[InlineKeyboardButton(g, callback_data=f"game_{g}")] for g in GAME_PLANS.keys()]
         await update.message.reply_text("गेम चुनें:", reply_markup=InlineKeyboardMarkup(kb))
@@ -103,8 +108,10 @@ async def message_handler(update, context):
         await context.bot.send_photo(ADMIN_ID, update.message.photo[-1].file_id, caption=f"Payment from {user_id}\n{g} | {p}", reply_markup=InlineKeyboardMarkup(kb))
         await update.message.reply_text("✅ स्क्रीनशॉट भेज दिया गया है।")
 
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(button_handler))
-app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
-app.run_polling()
+if __name__ == '__main__':
+    create_tables()
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
+    app.run_polling()
