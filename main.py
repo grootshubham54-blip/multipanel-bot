@@ -6,15 +6,10 @@ from database import (
     create_tables, save_user, is_banned, save_order, get_order, approve_order, 
     reject_order, save_key, get_user_keys, get_stock, get_total_users
 )
-# अब यहाँ से import सही काम करेगा क्योंकि आपने admin_keyboard.py बना ली है
-from admin_keyboard import (
-    admin_keyboard, admin_game_selection_keyboard, admin_plan_selection_keyboard
-)
 
 # Configuration
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN: raise ValueError("BOT_TOKEN missing")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7908981593"))
 PAYMENT_QR = os.getenv("PAYMENT_QR_FILE_ID", "YOUR_QR_FILE_ID")
 
@@ -25,13 +20,22 @@ GAME_PLANS = {
     "RAGE": {"1 Day": 150, "1 Week": 599, "1 Month": 1499}
 }
 
-async def error_handler(update, context): logging.error("BOT ERROR", exc_info=context.error)
-
+# --- KEYBOARD FUNCTIONS (Now inside main.py) ---
 def main_keyboard(uid):
     buttons = [["🎮 Games", "🔑 My Keys"], ["👤 Profile", "📞 Support"], ["💳 Payment"]]
     if uid == ADMIN_ID: buttons.append(["🛠 Admin Panel"])
     return ReplyKeyboardMarkup(buttons, resize_keyboard=True)
 
+def admin_keyboard():
+    return ReplyKeyboardMarkup([["📦 Stock", "🔑 Add Keys"], ["👥 Total Users", "🔙 Back to Admin"]], resize_keyboard=True)
+
+def admin_game_selection_keyboard():
+    return ReplyKeyboardMarkup([["👑 KING iOS", "WIN iOS"], ["VISION", "RAGE"]], resize_keyboard=True)
+
+def admin_plan_selection_keyboard():
+    return ReplyKeyboardMarkup([["1 Day", "1 Week"], ["1 Month"]], resize_keyboard=True)
+
+# --- BOT LOGIC ---
 async def start(update: Update, context):
     user = update.effective_user
     if is_banned(user.id): return
@@ -85,6 +89,7 @@ async def message_handler(update, context):
 
     if user.id == ADMIN_ID:
         if text == "🛠 Admin Panel": await update.message.reply_text("⚙️ Admin Panel", reply_markup=admin_keyboard()); return
+        if text == "🔙 Back to Admin": await update.message.reply_text("⚙️ Admin Panel", reply_markup=admin_keyboard()); return
         if text == "📦 Stock":
             stock = get_stock()
             if not stock: await update.message.reply_text("❌ Stock Empty"); return
@@ -117,11 +122,11 @@ async def message_handler(update, context):
     elif text == "💳 Payment": await update.message.reply_text("🎮 Games से plan select करें")
 
 def main():
+    create_tables()
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, message_handler))
-    app.add_error_handler(error_handler)
     app.run_polling()
 
 if __name__ == "__main__":
